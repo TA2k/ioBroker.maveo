@@ -23,7 +23,7 @@ Die maveo App Mail und Passwort eingeben.
 maveo.0.id.remote auf true setzen steuert den jeweiligen Befehl
 
 ## Diskussion und Fragen:
-https://forum.iobroker.net/topic/
+https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
 
