@@ -74,13 +74,15 @@ class Maveo extends utils.Adapter {
             };
             this.cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
             this.cognitoUser.authenticateUser(authenticationDetails, {
-                onSuccess: function (result) {
+                onSuccess: (result) => {
                     this.session.idToken = result.idToken.jwtToken;
                     this.session.refreshToken = result.refreshToken.token;
+
+                    this.setState("info.connection", true, true);
                     resolve(null);
                 },
 
-                onFailure: function (err) {
+                onFailure: (err) => {
                     this.log.error(err.message || JSON.stringify(err));
                     resolve(null);
                 },
