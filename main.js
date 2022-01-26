@@ -103,22 +103,23 @@ class Maveo extends utils.Adapter {
                 this.log.debug(JSON.stringify(res.data));
 
                 for (const device of res.data.devices) {
-                    this.deviceArray.push(device.id);
-                    await this.setObjectNotExistsAsync(device.id, {
+                    const id = device.deviceId;
+                    this.deviceArray.push(id);
+                    await this.setObjectNotExistsAsync(id, {
                         type: "device",
                         common: {
-                            name: device.id,
+                            name: id,
                         },
                         native: {},
                     });
-                    await this.setObjectNotExistsAsync(device.id + ".remote", {
+                    await this.setObjectNotExistsAsync(id + ".remote", {
                         type: "channel",
                         common: {
                             name: "Remote Controls",
                         },
                         native: {},
                     });
-                    await this.setObjectNotExistsAsync(device.id + ".general", {
+                    await this.setObjectNotExistsAsync(id + ".general", {
                         type: "channel",
                         common: {
                             name: "General Information",
@@ -128,7 +129,7 @@ class Maveo extends utils.Adapter {
 
                     const remoteArray = [];
                     remoteArray.forEach((remote) => {
-                        this.setObjectNotExists(device.id + ".remote." + remote.command, {
+                        this.setObjectNotExists(id + ".remote." + remote.command, {
                             type: "state",
                             common: {
                                 name: remote.name || "",
@@ -140,7 +141,7 @@ class Maveo extends utils.Adapter {
                             native: {},
                         });
                     });
-                    this.json2iob.parse(device.id + ".general", device);
+                    this.json2iob.parse(id + ".general", device);
                 }
             })
             .catch((error) => {
