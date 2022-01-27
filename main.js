@@ -248,7 +248,7 @@ class Maveo extends utils.Adapter {
         });
 
         this.ws.on("message",async (message) => {
-            this.log.debug("WS received:" + message);
+            this.log.info("WS received:" + message);
             try {
                 const parsed = JSON.parse(message);
                 if (parsed.notification ==="RemoteProxy.TunnelEstablished") {
