@@ -319,7 +319,7 @@ class Maveo extends utils.Adapter {
                     for (let i = 0; i < reply.things.length; i++) {
                         this.things[reply.things[i].id] = reply.things[i];
                         let thing = reply.things[i];
-                        let thingClass = thingClasses[thing.thingClassId];
+                        let thingClass = this.thingClasses[thing.thingClassId];
                         // Convert states from a list to a map for easier lookup
                         let states = {};
                         for (let j = 0; j < thing.states.length; j++) {
@@ -333,6 +333,9 @@ class Maveo extends utils.Adapter {
                     const thingId = parsed.params.thingId;
                     const stateTypeId = parsed.params.stateTypeId;
                     const stateType = this.stateTypes[stateTypeId];
+                    this.log.debug(JSON.stringify(stateType));
+                    let unit = stateType.unit === "UnitNone" ? null : stateType.unit.replace("Unit", "");
+
                     await this.setObjectNotExistsAsync(parsed.params.thingId, {
                         type: "device",
                         common: {
@@ -346,10 +349,10 @@ class Maveo extends utils.Adapter {
                         common: {
                             name: stateType.displayName,
                             type: "mixed",
-                            role: stateType.unit === "UnitUnixTime" ? "data" : "value",
+                            role: stateType.unit === "UnitUnixTime" ? "date" : "value",
                             write: true,
                             read: true,
-                            unit: stateType.unit === "UnitNone" ? null : stateType.unit,
+                            unit: unit,
                         },
                         native: {},
                     });
@@ -358,7 +361,6 @@ class Maveo extends utils.Adapter {
                     }
                     this.setState(thingId + "." + stateTypeId, parsed.params.value, true);
                 }
-
             } catch (error) {
                 this.log.error(error);
             }
