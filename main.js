@@ -180,23 +180,27 @@ class Maveo extends utils.Adapter {
 
 
     async connectToWS() {
-        this.nonce = uuidv4();
+        this.nonce = "{"+uuidv4()+"}";
+        const body =JSON.stringify({
+            "nonce":this.nonce,
+            "timestamp": this.nonce,
+            "token": this.session.idToken,
+        })
         const headers={
             "content-type": "application/json",
             "X-Amz-Date": this.amzDate(),
             "x-amz-security-token": this.session.Credentials.SessionToken,
-            "Connection": "Keep-Alive",
-            "Accept-Language": "de-DE,en,*",
             "User-Agent": "Mozilla/5.0"
         };
         const signed = aws4.sign(
             {
                 host: "a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com",
                 path: "/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
-                service: "execute-api",
+                service: "iotdata",
                 method: "POST",
                 region: "eu-west-1",
                 headers: headers,
+                body:body
             },
             { accessKeyId: this.session.Credentials.AccessKeyId, secretAccessKey: this.session.Credentials.SecretKey }
         );
@@ -205,11 +209,7 @@ class Maveo extends utils.Adapter {
             method: "post",
             url: "https://a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
             headers: headers,
-            data:  JSON.stringify({
-                "nonce":this.nonce,
-                "timestamp": this.nonce,
-                "token": this.session.idToken,
-            }),
+            data:  body,
         })
             .then((res) => {
                 this.log.debug(JSON.stringify(res.data));
