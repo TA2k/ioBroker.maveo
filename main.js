@@ -27,6 +27,7 @@ class Maveo extends utils.Adapter {
         this.on("stateChange", this.onStateChange.bind(this));
         this.on("unload", this.onUnload.bind(this));
 
+        this.json2iob = new Json2iob(this);
         this.session = {};
     }
 
@@ -44,7 +45,6 @@ class Maveo extends utils.Adapter {
         this.updateInterval = null;
         this.reLoginTimeout = null;
         this.refreshTokenTimeout = null;
-        this.json2iob = new Json2iob(this);
         this.deviceArray = [];
 
         await this.login();
@@ -136,7 +136,7 @@ class Maveo extends utils.Adapter {
                     await this.setObjectNotExistsAsync(id, {
                         type: "device",
                         common: {
-                            name: id,
+                            name: device.name,
                         },
                         native: {},
                     });
@@ -185,7 +185,7 @@ class Maveo extends utils.Adapter {
             "nonce":this.nonce,
             "timestamp": this.nonce,
             "token": this.session.idToken,
-        })
+        });
         const headers={
             "content-type": "application/json",
             "X-Amz-Date": this.amzDate(),
@@ -246,8 +246,73 @@ class Maveo extends utils.Adapter {
             );
         });
 
-        this.ws.on("message", (message) => {
+        this.ws.on("message",async (message) => {
             this.log.debug("WS received:" + message);
+            try {
+                const parsed = JSON.parse(message);
+                if (parsed.notification ==="RemoteProxy.TunnelEstablished") {
+                    this.log.debug("WS TunnelEstablished");
+                    this.ws.send(
+                        JSON.stringify({
+                            "id": 1,
+                            "method": "JSONRPC.Hello",
+                            "params": {
+                                "locale": "de_DE"
+                            },
+                            "token": null
+                        })
+                    );
+                    this.ws.send(
+                        JSON.stringify({
+                            "id": 2,
+                            "method": "JSONRPC.SetNotificationStatus",
+                            "params": {
+                                "namespaces": [
+                                    "Tags",
+                                    "Integrations",
+                                    "JSONRPC",
+                                    "System",
+                                    "Scripts",
+                                    "Configuration",
+                                    "Rules"
+                                ]
+                            },
+                            "token": null
+                        })
+                    );
+                    // this.ws.send(
+                    //     JSON.stringify({
+                    //         "id": 5,
+                    //         "method": "Integrations.GetThingClasses",
+                    //         "token": null
+                    //     })
+                    // );
+                }
+                if (parsed.notification==="Integrations.StateChanged" && parsed.params) {
+                    await this.setObjectNotExistsAsync(parsed.params.thingId, {
+                        type: "device",
+                        common: {
+                            name: "",
+                        },
+                        native: {},
+                    });
+                    await this.setObjectNotExistsAsync(parsed.params.thingId+"."+parsed.params.stateTypeId, {
+                        type: "state",
+                        common: {
+                            name: "",
+                            type: "mixed",
+                            role: "value",
+                            write: true,
+                            read: true,
+                        },
+                        native: {},
+                    });
+                    this.setState(parsed.params.thingId+"."+parsed.params.stateTypeId,parsed.params.value,true);
+                }
+
+            } catch (error) {
+                this.log.error(error);
+            }
         });
 
         this.ws.on("error", (err) => {
