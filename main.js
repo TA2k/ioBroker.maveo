@@ -28,6 +28,7 @@ class Maveo extends utils.Adapter {
         this.on("unload", this.onUnload.bind(this));
 
         this.session = {};
+        this.createsStates = {};
     }
 
     /**
@@ -86,17 +87,17 @@ class Maveo extends utils.Adapter {
                         url: "https://cognito-identity.eu-west-1.amazonaws.com/?Action=GetCredentialsForIdentity&Version=2016-06-30",
                         headers: {
                             "Content-Type": "application/x-amz-json-1.0",
-                            "Host": "cognito-identity.eu-west-1.amazonaws.com",
+                            Host: "cognito-identity.eu-west-1.amazonaws.com",
                             "X-Amz-Target": "AWSCognitoIdentityService.GetCredentialsForIdentity",
-                            "Connection": "Keep-Alive",
+                            Connection: "Keep-Alive",
                             "Accept-Language": "de-DE,en,*",
-                            "User-Agent": "Mozilla/5.0"
+                            "User-Agent": "Mozilla/5.0",
                         },
-                        data : '{"IdentityId":"eu-west-1:daee25fd-ba28-45c2-976e-1590bbf101c4","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' + this.session.idToken + '"}}',
+                        data: '{"IdentityId":"eu-west-1:daee25fd-ba28-45c2-976e-1590bbf101c4","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' + this.session.idToken + '"}}',
                     })
                         .then((res) => {
                             this.log.debug(JSON.stringify(res.data));
-                            this.session.Credentials =res.data.Credentials;
+                            this.session.Credentials = res.data.Credentials;
 
                             return res.data;
                         })
@@ -178,19 +179,18 @@ class Maveo extends utils.Adapter {
             });
     }
 
-
     async connectToWS() {
-        this.nonce = "{"+uuidv4()+"}";
-        const body =JSON.stringify({
-            "nonce":this.nonce,
-            "timestamp": this.nonce,
-            "token": this.session.idToken,
-        })
-        const headers={
+        this.nonce = "{" + uuidv4() + "}";
+        const body = JSON.stringify({
+            nonce: this.nonce,
+            timestamp: this.nonce,
+            token: this.session.idToken,
+        });
+        const headers = {
             "content-type": "application/json",
             "X-Amz-Date": this.amzDate(),
             "x-amz-security-token": this.session.Credentials.SessionToken,
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent": "Mozilla/5.0",
         };
         const signed = aws4.sign(
             {
@@ -200,28 +200,28 @@ class Maveo extends utils.Adapter {
                 method: "POST",
                 region: "eu-west-1",
                 headers: headers,
-                body:body
+                body: body,
             },
             { accessKeyId: this.session.Credentials.AccessKeyId, secretAccessKey: this.session.Credentials.SecretKey }
         );
-        headers["Authorization"] =signed.headers["Authorization"],
-        await this.requestClient({
-            method: "post",
-            url: "https://a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
-            headers: headers,
-            data:  body,
-        })
-            .then((res) => {
-                this.log.debug(JSON.stringify(res.data));
-                this.log.info("Topic subscribed");
-                return res.data;
+        (headers["Authorization"] = signed.headers["Authorization"]),
+            await this.requestClient({
+                method: "post",
+                url: "https://a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
+                headers: headers,
+                data: body,
             })
-            .catch((error) => {
-                this.log.error(error);
-                if (error.response) {
-                    this.log.error(JSON.stringify(error.response.data));
-                }
-            });
+                .then((res) => {
+                    this.log.debug(JSON.stringify(res.data));
+                    this.log.info("Topic subscribed");
+                    return res.data;
+                })
+                .catch((error) => {
+                    this.log.error(error);
+                    if (error.response) {
+                        this.log.error(JSON.stringify(error.response.data));
+                    }
+                });
 
         if (this.ws) {
             this.ws.close();
@@ -247,49 +247,92 @@ class Maveo extends utils.Adapter {
             );
         });
 
-        this.ws.on("message",async (message) => {
-            this.log.info("WS received:" + message);
+        this.ws.on("message", async (message) => {
+            this.log.debug("WS received:" + message);
             try {
                 const parsed = JSON.parse(message);
-                if (parsed.notification ==="RemoteProxy.TunnelEstablished") {
+                if (parsed.notification === "RemoteProxy.TunnelEstablished") {
                     this.log.info("WS TunnelEstablished");
                     this.ws.send(
                         JSON.stringify({
-                            "id": 1,
-                            "method": "JSONRPC.Hello",
-                            "params": {
-                                "locale": "de_DE"
+                            id: 1,
+                            method: "JSONRPC.Hello",
+                            params: {
+                                locale: "de_DE",
                             },
-                            "token": null
+                            token: null,
                         })
                     );
                     this.ws.send(
                         JSON.stringify({
-                            "id": 2,
-                            "method": "JSONRPC.SetNotificationStatus",
-                            "params": {
-                                "namespaces": [
-                                    "Tags",
-                                    "Integrations",
-                                    "JSONRPC",
-                                    "System",
-                                    "Scripts",
-                                    "Configuration",
-                                    "Rules"
-                                ]
+                            id: 2,
+                            method: "JSONRPC.SetNotificationStatus",
+                            params: {
+                                namespaces: ["Tags", "Integrations", "JSONRPC", "System", "Scripts", "Configuration", "Rules"],
                             },
-                            "token": null
+                            token: null,
                         })
                     );
-                    // this.ws.send(
-                    //     JSON.stringify({
-                    //         "id": 5,
-                    //         "method": "Integrations.GetThingClasses",
-                    //         "token": null
-                    //     })
-                    // );
+                    this.ws.send(
+                        JSON.stringify({
+                            id: 5,
+                            method: "Integrations.GetThingClasses",
+                            token: null,
+                        })
+                    );
+                    this.ws.send(
+                        JSON.stringify({
+                            id: 6,
+                            method: "Integrations.GetThings",
+                            token: null,
+                        })
+                    );
                 }
-                if (parsed.notification==="Integrations.StateChanged" && parsed.params) {
+                if (parsed.id === 5) {
+                    this.thingClasses = {};
+                    this.stateTypes = {};
+                    const reply = parsed.params;
+                    for (let i = 0; i < reply.thingClasses.length; i++) {
+                        let thingClass = reply.thingClasses[i];
+                        // Convert stateTypes from a list to a map for easier lookup
+                        let stateTypes = {};
+                        for (let j = 0; j < thingClass.stateTypes.length; j++) {
+                            let stateType = thingClass.stateTypes[j];
+                            stateTypes[stateType.id] = stateType;
+                        }
+                        thingClass.stateTypes = stateTypes;
+                        this.stateTypes = { ...this.stateTypes, ...stateTypes };
+                        // Convert actionTyes from a list to a map or easier lookup
+                        let actionTypes = {};
+                        for (let j = 0; j < thingClass.actionTypes.length; j++) {
+                            let actionType = thingClass.actionTypes[j];
+                            actionTypes[actionType.id] = actionType;
+                        }
+                        thingClass.actionTypes = actionTypes;
+
+                        this.thingClasses[thingClass.id] = thingClass;
+                    }
+                }
+                if (parsed.id === 6) {
+                    this.things = {};
+                    const reply = parsed.params;
+                    for (let i = 0; i < reply.things.length; i++) {
+                        this.things[reply.things[i].id] = reply.things[i];
+                        let thing = reply.things[i];
+                        let thingClass = thingClasses[thing.thingClassId];
+                        // Convert states from a list to a map for easier lookup
+                        let states = {};
+                        for (let j = 0; j < thing.states.length; j++) {
+                            let state = thing.states[j];
+                            states[state.stateTypeId] = state;
+                        }
+                        thing["states"] = states;
+                    }
+                }
+                if (parsed.notification === "Integrations.StateChanged" && parsed.params) {
+                    const thingId = parsed.params.thingId;
+                    const stateTypeId = parsed.params.stateTypeId;
+                    const stateType = this.stateTypes[stateTypeId];
                     await this.setObjectNotExistsAsync(parsed.params.thingId, {
                         type: "device",
                         common: {
@@ -297,18 +340,23 @@ class Maveo extends utils.Adapter {
                         },
                         native: {},
                     });
-                    await this.setObjectNotExistsAsync(parsed.params.thingId+"."+parsed.params.stateTypeId, {
+
+                    await this.setObjectNotExistsAsync(thingId + "." + stateTypeId, {
                         type: "state",
                         common: {
-                            name: "",
+                            name: stateType.displayName,
                             type: "mixed",
-                            role: "value",
+                            role: stateType.unit === "UnitUnixTime" ? "data" : "value",
                             write: true,
                             read: true,
+                            unit: stateType.unit === "UnitNone" ? null : stateType.unit,
                         },
                         native: {},
                     });
-                    this.setState(parsed.params.thingId+"."+parsed.params.stateTypeId,parsed.params.value,true);
+                    if (stateType.unit === "UnitUnixTime") {
+                        parsed.params.value = parsed.params.value * 1000;
+                    }
+                    this.setState(thingId + "." + stateTypeId, parsed.params.value, true);
                 }
 
             } catch (error) {
@@ -386,7 +434,6 @@ class Maveo extends utils.Adapter {
                             this.log.error(JSON.stringify(error.response.data));
                         }
                     });
-
             }
         }
     }
