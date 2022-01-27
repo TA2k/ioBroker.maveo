@@ -27,7 +27,6 @@ class Maveo extends utils.Adapter {
         this.on("stateChange", this.onStateChange.bind(this));
         this.on("unload", this.onUnload.bind(this));
 
-        this.json2iob = new Json2iob(this);
         this.session = {};
     }
 
@@ -45,6 +44,7 @@ class Maveo extends utils.Adapter {
         this.updateInterval = null;
         this.reLoginTimeout = null;
         this.refreshTokenTimeout = null;
+        this.json2iob = new Json2iob(this);
         this.deviceArray = [];
 
         await this.login();
@@ -185,7 +185,7 @@ class Maveo extends utils.Adapter {
             "nonce":this.nonce,
             "timestamp": this.nonce,
             "token": this.session.idToken,
-        });
+        })
         const headers={
             "content-type": "application/json",
             "X-Amz-Date": this.amzDate(),
@@ -213,6 +213,7 @@ class Maveo extends utils.Adapter {
         })
             .then((res) => {
                 this.log.debug(JSON.stringify(res.data));
+                this.log.info("Topic subscribed");
                 return res.data;
             })
             .catch((error) => {
@@ -230,7 +231,7 @@ class Maveo extends utils.Adapter {
         });
 
         this.ws.on("open", () => {
-            this.log.debug("WS open");
+            this.log.info("Websocket open");
             this.ws.send(JSON.stringify({ id: 0, method: "RemoteProxy.Hello" }));
             this.ws.send(
                 JSON.stringify({
@@ -251,7 +252,7 @@ class Maveo extends utils.Adapter {
             try {
                 const parsed = JSON.parse(message);
                 if (parsed.notification ==="RemoteProxy.TunnelEstablished") {
-                    this.log.debug("WS TunnelEstablished");
+                    this.log.info("WS TunnelEstablished");
                     this.ws.send(
                         JSON.stringify({
                             "id": 1,
