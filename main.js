@@ -8,6 +8,9 @@
 // you need to create an adapter
 const utils = require("@iobroker/adapter-core");
 const axios = require("axios");
+const WebSocket = require("ws");
+const { v4: uuidv4 } = require("uuid");
+const aws4 = require("aws4");
 const Json2iob = require("./lib/json2iob");
 const AmazonCognitoIdentity = require("amazon-cognito-identity-js");
 
@@ -23,6 +26,8 @@ class Maveo extends utils.Adapter {
         this.on("ready", this.onReady.bind(this));
         this.on("stateChange", this.onStateChange.bind(this));
         this.on("unload", this.onUnload.bind(this));
+
+        this.session = {};
     }
 
     /**
@@ -41,16 +46,13 @@ class Maveo extends utils.Adapter {
         this.refreshTokenTimeout = null;
         this.json2iob = new Json2iob(this);
         this.deviceArray = [];
-        this.session = {};
 
         await this.login();
 
         if (this.session.idToken) {
             await this.getDeviceList();
-            await this.updateDevices();
-            this.updateInterval = setInterval(async () => {
-                await this.updateDevices();
-            }, this.config.interval * 60 * 1000);
+            await this.connectToWS();
+
             this.refreshTokenInterval = setInterval(() => {
                 this.refreshToken();
             }, 3500 * 1000);
@@ -74,11 +76,36 @@ class Maveo extends utils.Adapter {
             };
             this.cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
             this.cognitoUser.authenticateUser(authenticationDetails, {
-                onSuccess: (result) => {
+                onSuccess: async (result) => {
                     this.log.debug(JSON.stringify(result));
                     this.session.idToken = result.idToken.jwtToken;
                     this.session.refreshToken = result.refreshToken.token;
 
+                    await this.requestClient({
+                        method: "post",
+                        url: "https://cognito-identity.eu-west-1.amazonaws.com/?Action=GetCredentialsForIdentity&Version=2016-06-30",
+                        headers: {
+                            "Content-Type": "application/x-amz-json-1.0",
+                            "Host": "cognito-identity.eu-west-1.amazonaws.com",
+                            "X-Amz-Target": "AWSCognitoIdentityService.GetCredentialsForIdentity",
+                            "Connection": "Keep-Alive",
+                            "Accept-Language": "de-DE,en,*",
+                            "User-Agent": "Mozilla/5.0"
+                        },
+                        data : '{"IdentityId":"eu-west-1:daee25fd-ba28-45c2-976e-1590bbf101c4","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' + this.session.idToken + '"}}',
+                    })
+                        .then((res) => {
+                            this.log.debug(JSON.stringify(res.data));
+                            this.session.Credentials =res.data.Credentials;
+
+                            return res.data;
+                        })
+                        .catch((error) => {
+                            this.log.error(error);
+                            if (error.response) {
+                                this.log.error(JSON.stringify(error.response.data));
+                            }
+                        });
                     this.setState("info.connection", true, true);
                     resolve(null);
                 },
@@ -151,58 +178,80 @@ class Maveo extends utils.Adapter {
             });
     }
 
-    async updateDevices() {
-        const statusArray = [
-            {
-                path: "status",
-                url: "https://api-cloud.nymea.io/users/devices/$id",
-                desc: "Status of the device",
-            },
-        ];
 
-        const headers = {
-            "accept-charset": "UTF-8, ISO-8859-1",
-            "x-api-idtoken": this.session.idToken,
-            "user-agent": "Dalvik/2.1.0 (Linux; U; Android 9; SM-A805F Build/PPR1.180610.011)",
+    async connectToWS() {
+        this.nonce = uuidv4();
+        const headers={
+            "content-type": "application/json",
+            "X-Amz-Date": this.amzDate(),
+            "x-amz-security-token": this.session.Credentials.SessionToken,
+            "Connection": "Keep-Alive",
+            "Accept-Language": "de-DE,en,*",
+            "User-Agent": "Mozilla/5.0"
         };
-        this.deviceArray.forEach(async (id) => {
-            statusArray.forEach(async (element) => {
-                const url = element.url.replace("$id", id);
-
-                await this.requestClient({
-                    method: "get",
-                    url: url,
-                    headers: headers,
-                })
-                    .then((res) => {
-                        this.log.debug(JSON.stringify(res.data));
-                        if (!res.data) {
-                            return;
-                        }
-                        const data = res.data;
-
-                        const forceIndex = null;
-                        const preferedArrayName = null;
-
-                        this.json2iob.parse(id + "." + element.path, data, { forceIndex: forceIndex, preferedArrayName: preferedArrayName, channelName: element.desc });
-                    })
-                    .catch((error) => {
-                        if (error.response && error.response.status === 401) {
-                            error.response && this.log.debug(JSON.stringify(error.response.data));
-                            this.log.info(element.path + " receive 401 error. Refresh Token in 60 seconds");
-                            clearTimeout(this.refreshTokenTimeout);
-                            this.refreshTokenTimeout = setTimeout(() => {
-                                this.refreshToken();
-                            }, 1000 * 60);
-
-                            return;
-                        }
-
-                        this.log.error(url);
-                        this.log.error(error);
-                        error.response && this.log.error(JSON.stringify(error.response.data));
-                    });
+        const signed = aws4.sign(
+            {
+                host: "a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com",
+                path: "/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
+                service: "execute-api",
+                method: "POST",
+                region: "eu-west-1",
+                headers: headers,
+            },
+            { accessKeyId: this.session.Credentials.AccessKeyId, secretAccessKey: this.session.Credentials.SecretKey }
+        );
+        headers["Authorization"] =signed.headers["Authorization"],
+        await this.requestClient({
+            method: "post",
+            url: "https://a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
+            headers: headers,
+            data:  JSON.stringify({
+                "nonce":this.nonce,
+                "timestamp": this.nonce,
+                "token": this.session.idToken,
+            }),
+        })
+            .then((res) => {
+                this.log.debug(JSON.stringify(res.data));
+                return res.data;
+            })
+            .catch((error) => {
+                this.log.error(error);
+                if (error.response) {
+                    this.log.error(JSON.stringify(error.response.data));
+                }
             });
+
+        if (this.ws) {
+            this.ws.close();
+        }
+        this.ws = new WebSocket("wss://remoteproxy.nymea.io", {
+            perMessageDeflate: false,
+        });
+
+        this.ws.on("open", () => {
+            this.log.debug("WS open");
+            this.ws.send(JSON.stringify({ id: 0, method: "RemoteProxy.Hello" }));
+            this.ws.send(
+                JSON.stringify({
+                    id: 0,
+                    method: "Authentication.Authenticate",
+                    params: {
+                        name: "maveo-app",
+                        nonce: this.nonce,
+                        token: this.session.idToken,
+                        uuid: uuidv4(),
+                    },
+                })
+            );
+        });
+
+        this.ws.on("message", (message) => {
+            this.log.debug("WS received:" + message);
+        });
+
+        this.ws.on("error", (err) => {
+            this.log.error("websocket error: " + err);
         });
     }
     async refreshToken() {
@@ -218,7 +267,9 @@ class Maveo extends utils.Adapter {
             this.session.refreshToken = result.refreshToken.token;
         });
     }
-
+    amzDate() {
+        return new Date().toISOString().slice(0, 20).replace(/-/g, "").replace(/:/g, "").replace(/\./g, "") + "Z";
+    }
     /**
      * Is called when adapter shuts down - callback has to be called under any circumstances!
      * @param {() => void} callback
@@ -269,10 +320,7 @@ class Maveo extends utils.Adapter {
                             this.log.error(JSON.stringify(error.response.data));
                         }
                     });
-                clearTimeout(this.refreshTimeout);
-                this.refreshTimeout = setTimeout(async () => {
-                    await this.updateDevices();
-                }, 10 * 1000);
+
             }
         }
     }
