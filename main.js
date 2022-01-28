@@ -180,6 +180,9 @@ class Maveo extends utils.Adapter {
     }
 
     async connectToWS() {
+        if (this.ws) {
+            this.ws.close();
+        }
         this.nonce = "{" + uuidv4() + "}";
         const body = JSON.stringify({
             nonce: this.nonce,
@@ -221,17 +224,22 @@ class Maveo extends utils.Adapter {
                     if (error.response) {
                         this.log.error(JSON.stringify(error.response.data));
                     }
+                    return;
                 });
 
-        if (this.ws) {
-            this.ws.close();
-        }
         this.ws = new WebSocket("wss://remoteproxy.nymea.io", {
             perMessageDeflate: false,
         });
-
+        this.reconnecing = false;
+        this.ws.on("close", () => {
+            this.log.info("Websocket closed");
+            if (!this.reconnecing) {
+                this.connectToWS();
+            }
+        });
         this.ws.on("open", () => {
             this.log.info("Websocket open");
+
             this.ws.send(JSON.stringify({ id: 0, method: "RemoteProxy.Hello" }));
             this.ws.send(
                 JSON.stringify({
@@ -249,6 +257,12 @@ class Maveo extends utils.Adapter {
 
         this.ws.on("message", async (message) => {
             this.log.debug("WS received:" + message);
+            this.reconnectTimeout && clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = setTimeout(() => {
+                this.log.info("WS reconnecting");
+                this.reconnecing = true;
+                this.connectToWS();
+            }, 11 * 60 * 1000);
             try {
                 const parsed = JSON.parse(message);
                 if (parsed.notification === "RemoteProxy.TunnelEstablished") {
@@ -268,25 +282,27 @@ class Maveo extends utils.Adapter {
                             id: 2,
                             method: "JSONRPC.SetNotificationStatus",
                             params: {
-                                namespaces: ["Tags", "Integrations", "JSONRPC", "System", "Scripts", "Configuration", "Rules"],
+                                namespaces: ["Tags", "Integrations", "JSONRPC", "System", "Scripts", "Configuration", "Rules", "Logging"],
                             },
                             token: null,
                         })
                     );
-                    this.ws.send(
-                        JSON.stringify({
-                            id: 5,
-                            method: "Integrations.GetThingClasses",
-                            token: null,
-                        })
-                    );
-                    this.ws.send(
-                        JSON.stringify({
-                            id: 6,
-                            method: "Integrations.GetThings",
-                            token: null,
-                        })
-                    );
+                    if (!this.thingClasses) {
+                        this.ws.send(
+                            JSON.stringify({
+                                id: 5,
+                                method: "Integrations.GetThingClasses",
+                                token: null,
+                            })
+                        );
+                        this.ws.send(
+                            JSON.stringify({
+                                id: 6,
+                                method: "Integrations.GetThings",
+                                token: null,
+                            })
+                        );
+                    }
                 }
                 if (parsed.id === 5) {
                     this.thingClasses = {};
@@ -371,6 +387,7 @@ class Maveo extends utils.Adapter {
         });
     }
     async refreshToken() {
+        this.log.debug("Refreshing token");
         const token = new AmazonCognitoIdentity.CognitoRefreshToken({
             RefreshToken: this.session.refreshToken,
         });
@@ -379,6 +396,7 @@ class Maveo extends utils.Adapter {
                 this.log.error(JSON.stringify(err));
                 return;
             }
+            this.log.debug(JSON.stringify(result));
             this.session.idToken = result.idToken.jwtToken;
             this.session.refreshToken = result.refreshToken.token;
         });
