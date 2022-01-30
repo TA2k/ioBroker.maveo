@@ -234,25 +234,29 @@ class Maveo extends utils.Adapter {
         this.ws.on("close", () => {
             this.log.info("Websocket closed");
             if (!this.reconnecing) {
+                this.reconnecing = true;
                 this.connectToWS();
             }
         });
         this.ws.on("open", () => {
             this.log.info("Websocket open");
-
-            this.ws.send(JSON.stringify({ id: 0, method: "RemoteProxy.Hello" }));
-            this.ws.send(
-                JSON.stringify({
-                    id: 0,
-                    method: "Authentication.Authenticate",
-                    params: {
-                        name: "maveo-app",
-                        nonce: this.nonce,
-                        token: this.session.idToken,
-                        uuid: uuidv4(),
-                    },
-                })
-            );
+            try {
+                this.ws.send(JSON.stringify({ id: 0, method: "RemoteProxy.Hello" }));
+                this.ws.send(
+                    JSON.stringify({
+                        id: 0,
+                        method: "Authentication.Authenticate",
+                        params: {
+                            name: "maveo-app",
+                            nonce: this.nonce,
+                            token: this.session.idToken,
+                            uuid: uuidv4(),
+                        },
+                    })
+                );
+            } catch (error) {
+                this.log.error(error);
+            }
         });
 
         this.ws.on("message", async (message) => {
@@ -391,7 +395,7 @@ class Maveo extends utils.Adapter {
         const token = new AmazonCognitoIdentity.CognitoRefreshToken({
             RefreshToken: this.session.refreshToken,
         });
-        this.cognitoUser.refreshSession(token, (err, result) => {
+        this.cognitoUser.refreshSession(token, async (err, result) => {
             if (err) {
                 this.log.error(JSON.stringify(err));
                 return;
@@ -399,6 +403,31 @@ class Maveo extends utils.Adapter {
             this.log.debug(JSON.stringify(result));
             this.session.idToken = result.idToken.jwtToken;
             this.session.refreshToken = result.refreshToken.token;
+            await this.requestClient({
+                method: "post",
+                url: "https://cognito-identity.eu-west-1.amazonaws.com/?Action=GetCredentialsForIdentity&Version=2016-06-30",
+                headers: {
+                    "Content-Type": "application/x-amz-json-1.0",
+                    Host: "cognito-identity.eu-west-1.amazonaws.com",
+                    "X-Amz-Target": "AWSCognitoIdentityService.GetCredentialsForIdentity",
+                    Connection: "Keep-Alive",
+                    "Accept-Language": "de-DE,en,*",
+                    "User-Agent": "Mozilla/5.0",
+                },
+                data: '{"IdentityId":"eu-west-1:daee25fd-ba28-45c2-976e-1590bbf101c4","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' + this.session.idToken + '"}}',
+            })
+                .then((res) => {
+                    this.log.debug(JSON.stringify(res.data));
+                    this.session.Credentials = res.data.Credentials;
+
+                    return res.data;
+                })
+                .catch((error) => {
+                    this.log.error(error);
+                    if (error.response) {
+                        this.log.error(JSON.stringify(error.response.data));
+                    }
+                });
         });
     }
     amzDate() {
