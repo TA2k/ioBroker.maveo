@@ -29,6 +29,7 @@ class Maveo extends utils.Adapter {
 
         this.session = {};
         this.createsStates = {};
+        this.currentMessage = "";
     }
 
     /**
@@ -259,8 +260,9 @@ class Maveo extends utils.Adapter {
             }
         });
 
-        this.ws.on("message", async (message) => {
-            this.log.debug("WS received:" + message);
+        this.ws.on("message", async (data, isBinary) => {
+            const message = isBinary ? data : data.toString();
+            // this.log.debug("WS received:" + message);
             this.reconnectTimeout && clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = setTimeout(() => {
                 this.log.info("WS reconnecting");
@@ -268,9 +270,31 @@ class Maveo extends utils.Adapter {
                 this.connectToWS();
             }, 11 * 60 * 1000);
             try {
-                const parsed = JSON.parse(message);
+                let parsed = {};
+                let messageArray = [];
+                try {
+                    if (message.startsWith('{"id":')) {
+                        messageArray = message.split("\n");
+                        this.currentMessage = message;
+                        message;
+                        parsed = JSON.parse(message);
+                        this.log.debug(`Parsed successfully: ${parsed.id}`);
+                    } else {
+                        this.currentMessage += message;
+                        parsed = JSON.parse(this.currentMessage);
+                        this.log.debug(`Parsed successfully: ${parsed.id}`);
+                    }
+                } catch (error) {
+                    this.log.debug("Parsing failed wait for next message " + message.substring(0, 15));
+                    if (messageArray <= 2) {
+                        return;
+                    }
+                }
+                if (parsed.status === "error") {
+                    this.log.error(message);
+                    return;
+                }
                 if (parsed.notification === "RemoteProxy.TunnelEstablished") {
-                    this.log.info("WS TunnelEstablished");
                     this.ws.send(
                         JSON.stringify({
                             id: 1,
@@ -281,31 +305,25 @@ class Maveo extends utils.Adapter {
                             token: null,
                         })
                     );
+                    await this.sleep(1000);
+                    this.log.debug("WS sending:" + 2);
                     this.ws.send(
-                        JSON.stringify({
-                            id: 2,
-                            method: "JSONRPC.SetNotificationStatus",
-                            params: {
-                                namespaces: ["Tags", "Integrations", "JSONRPC", "System", "Scripts", "Configuration", "Rules", "Logging"],
-                            },
-                            token: null,
-                        })
+                        '{"id":2,"method":"JSONRPC.SetNotificationStatus","params":{"namespaces":["System","JSONRPC","Integrations","Rules","Logging","Configuration","Tags","Scripts"]},"token":null}'
                     );
+
+                    await this.sleep(1000);
+                    this.log.debug("WS sending:" + 3);
+                    this.ws.send('{"id":3,"method":"JSONRPC.IsCloudConnected","token":null}');
+
                     if (!this.thingClasses) {
-                        this.ws.send(
-                            JSON.stringify({
-                                id: 5,
-                                method: "Integrations.GetThingClasses",
-                                token: null,
-                            })
-                        );
-                        this.ws.send(
-                            JSON.stringify({
-                                id: 6,
-                                method: "Integrations.GetThings",
-                                token: null,
-                            })
-                        );
+                        await this.sleep(1000);
+
+                        this.log.debug("WS sending:" + 5);
+                        this.ws.send('{"id":5,"method":"Integrations.GetThingClasses","token": null}');
+                        await this.sleep(5000);
+
+                        this.log.debug("WS sending:" + 6);
+                        this.ws.send('{"id":6,"method":"Integrations.GetThings","token":null}');
                     }
                 }
                 if (parsed.id === 5) {
@@ -349,37 +367,46 @@ class Maveo extends utils.Adapter {
                         thing["states"] = states;
                     }
                 }
-                if (parsed.notification === "Integrations.StateChanged" && parsed.params) {
-                    const thingId = parsed.params.thingId;
-                    const stateTypeId = parsed.params.stateTypeId;
-                    const stateType = this.stateTypes[stateTypeId];
-                    this.log.debug(JSON.stringify(stateType));
-                    let unit = stateType.unit === "UnitNone" ? null : stateType.unit.replace("Unit", "");
+                if (messageArray.length > 2 || (parsed.notification === "Integrations.StateChanged" && parsed.params)) {
+                    for (let parsed of messageArray) {
+                        if (!parsed) {
+                            continue;
+                        }
+                        parsed = JSON.parse(parsed);
+                        if (parsed.notification != "Integrations.StateChanged" || !parsed.params) {
+                            continue;
+                        }
+                        const thingId = parsed.params.thingId;
+                        const stateTypeId = parsed.params.stateTypeId;
+                        const stateType = this.stateTypes[stateTypeId];
+                        this.log.debug(JSON.stringify(stateType));
+                        let unit = stateType.unit === "UnitNone" ? null : stateType.unit.replace("Unit", "");
 
-                    await this.setObjectNotExistsAsync(parsed.params.thingId, {
-                        type: "device",
-                        common: {
-                            name: "",
-                        },
-                        native: {},
-                    });
+                        await this.setObjectNotExistsAsync(parsed.params.thingId, {
+                            type: "device",
+                            common: {
+                                name: "",
+                            },
+                            native: {},
+                        });
 
-                    await this.setObjectNotExistsAsync(thingId + "." + stateTypeId, {
-                        type: "state",
-                        common: {
-                            name: stateType.displayName,
-                            type: "mixed",
-                            role: stateType.unit === "UnitUnixTime" ? "date" : "value",
-                            write: true,
-                            read: true,
-                            unit: unit,
-                        },
-                        native: {},
-                    });
-                    if (stateType.unit === "UnitUnixTime") {
-                        parsed.params.value = parsed.params.value * 1000;
+                        await this.setObjectNotExistsAsync(thingId + "." + stateTypeId, {
+                            type: "state",
+                            common: {
+                                name: stateType.displayName,
+                                type: "mixed",
+                                role: stateType.unit === "UnitUnixTime" ? "date" : "value",
+                                write: true,
+                                read: true,
+                                unit: unit,
+                            },
+                            native: {},
+                        });
+                        if (stateType.unit === "UnitUnixTime") {
+                            parsed.params.value = parsed.params.value * 1000;
+                        }
+                        this.setState(thingId + "." + stateTypeId, parsed.params.value, true);
                     }
-                    this.setState(thingId + "." + stateTypeId, parsed.params.value, true);
                 }
             } catch (error) {
                 this.log.error(error);
@@ -429,6 +456,9 @@ class Maveo extends utils.Adapter {
                     }
                 });
         });
+    }
+    sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
     amzDate() {
         return new Date().toISOString().slice(0, 20).replace(/-/g, "").replace(/:/g, "").replace(/\./g, "") + "Z";
