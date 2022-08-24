@@ -69,7 +69,7 @@ class Maveo extends utils.Adapter {
             const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
             const poolData = {
                 UserPoolId: "eu-west-1_d4DdcqKJ8",
-                ClientId: "6jht51ls3kqt7rrl4ff414u1jr",
+                ClientId: "7rf6da8pcqi1qi8tp1evf933h2",
             };
             const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
             const userData = {
@@ -94,7 +94,10 @@ class Maveo extends utils.Adapter {
                             "Accept-Language": "de-DE,en,*",
                             "User-Agent": "Mozilla/5.0",
                         },
-                        data: '{"IdentityId":"eu-west-1:daee25fd-ba28-45c2-976e-1590bbf101c4","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' + this.session.idToken + '"}}',
+                        data:
+                            '{"IdentityId":"eu-west-1:0dee80a0-cc10-4e01-9f84-34ca36d06cbb","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' +
+                            this.session.idToken +
+                            '"}}',
                     })
                         .then((res) => {
                             this.log.debug(JSON.stringify(res.data));
@@ -199,7 +202,7 @@ class Maveo extends utils.Adapter {
         const signed = aws4.sign(
             {
                 host: "a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com",
-                path: "/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
+                path: "/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3A0dee80a0-cc10-4e01-9f84-34ca36d06cbb%2Fproxy?qos=1",
                 service: "iotdata",
                 method: "POST",
                 region: "eu-west-1",
@@ -211,7 +214,7 @@ class Maveo extends utils.Adapter {
         (headers["Authorization"] = signed.headers["Authorization"]),
             await this.requestClient({
                 method: "post",
-                url: "https://a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3Adaee25fd-ba28-45c2-976e-1590bbf101c4%2Fproxy?qos=1",
+                url: "https://a27q7a2x15m8h3-ats.iot.eu-west-1.amazonaws.com/topics/90613aac-404e-47ea-8775-217db52a0b34%2Feu-west-1%3A0dee80a0-cc10-4e01-9f84-34ca36d06cbb%2Fproxy?qos=1",
                 headers: headers,
                 data: body,
             })
@@ -441,7 +444,10 @@ class Maveo extends utils.Adapter {
                     "Accept-Language": "de-DE,en,*",
                     "User-Agent": "Mozilla/5.0",
                 },
-                data: '{"IdentityId":"eu-west-1:daee25fd-ba28-45c2-976e-1590bbf101c4","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' + this.session.idToken + '"}}',
+                data:
+                    '{"IdentityId":"eu-west-1:0dee80a0-cc10-4e01-9f84-34ca36d06cbb","Logins":{"cognito-idp.eu-west-1.amazonaws.com/eu-west-1_d4DdcqKJ8":"' +
+                    this.session.idToken +
+                    '"}}',
             })
                 .then((res) => {
                     this.log.debug(JSON.stringify(res.data));
