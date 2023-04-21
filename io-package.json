@@ -1,119 +1,113 @@
 {
-    "common": {
-        "name": "maveo",
-        "version": "0.0.4",
-        "news": {
-            "0.0.4": {
-                "en": "fix status"
-            },
-            "0.0.3": {
-                "en": "initial release",
-                "de": "Erstveröffentlichung",
-                "ru": "Начальная версия",
-                "pt": "lançamento inicial",
-                "nl": "Eerste uitgave",
-                "fr": "Première version",
-                "it": "Versione iniziale",
-                "es": "Versión inicial",
-                "pl": "Pierwsze wydanie",
-                "zh-cn": "首次出版"
-            }
-        },
-        "title": "Maveo",
-        "titleLang": {
-            "en": "Maveo",
-            "de": "Maveo",
-            "ru": "Мавео",
-            "pt": "Maveo",
-            "nl": "Maveo",
-            "fr": "Mavéo",
-            "it": "Maveo",
-            "es": "Maveo",
-            "pl": "Maveo",
-            "zh-cn": "马威奥"
-        },
-        "desc": {
-            "en": "Adapter for maveo garagedoor app",
-            "de": "Adapter für maveo Garagentor-App",
-            "ru": "Адаптер для приложения maveo garagedoor",
-            "pt": "Adaptador para aplicativo maveo garagedoor",
-            "nl": "Adapter voor maveo garagedeur-app",
-            "fr": "Adaptateur pour application maveo garagedoor",
-            "it": "Adattatore per app maveo garagedoor",
-            "es": "Adaptador para la aplicación maveo garagedoor",
-            "pl": "Adapter do aplikacji bram garażowych maveo",
-            "zh-cn": "用于 maveo 车库门应用程序的适配器"
-        },
-        "authors": [
-            "TA2k <tombox2020@gmail.com>"
-        ],
-        "keywords": [
-            "maveo",
-            "marantec"
-        ],
-        "license": "MIT",
-        "platform": "Javascript/Node.js",
-        "main": "main.js",
-        "icon": "maveo.png",
-        "enabled": true,
-        "extIcon": "https://raw.githubusercontent.com/TA2k/ioBroker.maveo/master/admin/maveo.png",
-        "readme": "https://github.com/TA2k/ioBroker.maveo/blob/master/README.md",
-        "loglevel": "info",
-        "mode": "daemon",
-        "type": "household",
-        "compact": true,
-        "connectionType": "cloud",
-        "dataSource": "poll",
-        "materialize": true,
-        "plugins": {
-            "sentry": {
-                "dsn": "https://779383e66a4d4f7a8adb8ed7039dc36d@sentry.iobroker.net/151"
-            }
-        },
-        "dependencies": [
-            {
-                "js-controller": ">=3.0.0"
-            }
-        ],
-        "globalDependencies": [
-            {
-                "admin": ">=4.0.9"
-            }
-        ]
+  "common": {
+    "name": "maveo",
+    "version": "0.0.5",
+    "news": {
+      "0.0.5": {
+        "en": "update login keys"
+      },
+      "0.0.4": {
+        "en": "fix status"
+      },
+      "0.0.3": {
+        "en": "initial release",
+        "de": "Erstveröffentlichung",
+        "ru": "Начальная версия",
+        "pt": "lançamento inicial",
+        "nl": "Eerste uitgave",
+        "fr": "Première version",
+        "it": "Versione iniziale",
+        "es": "Versión inicial",
+        "pl": "Pierwsze wydanie",
+        "zh-cn": "首次出版"
+      }
     },
-    "encryptedNative": [
-        "password"
-    ],
-    "protectedNative": [
-        "password"
-    ],
-    "native": {
-        "username": "",
-        "password": "",
-        "interval": 10
+    "title": "Maveo",
+    "titleLang": {
+      "en": "Maveo",
+      "de": "Maveo",
+      "ru": "Мавео",
+      "pt": "Maveo",
+      "nl": "Maveo",
+      "fr": "Mavéo",
+      "it": "Maveo",
+      "es": "Maveo",
+      "pl": "Maveo",
+      "zh-cn": "马威奥"
     },
-    "objects": [],
-    "instanceObjects": [
-        {
-            "_id": "info",
-            "type": "channel",
-            "common": {
-                "name": "Information"
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.connection",
-            "type": "state",
-            "common": {
-                "role": "indicator.connected",
-                "name": "Device or service connected",
-                "type": "boolean",
-                "read": true,
-                "write": false,
-                "def": false
-            },
-            "native": {}
-        }
+    "desc": {
+      "en": "Adapter for maveo garagedoor app",
+      "de": "Adapter für maveo Garagentor-App",
+      "ru": "Адаптер для приложения maveo garagedoor",
+      "pt": "Adaptador para aplicativo maveo garagedoor",
+      "nl": "Adapter voor maveo garagedeur-app",
+      "fr": "Adaptateur pour application maveo garagedoor",
+      "it": "Adattatore per app maveo garagedoor",
+      "es": "Adaptador para la aplicación maveo garagedoor",
+      "pl": "Adapter do aplikacji bram garażowych maveo",
+      "zh-cn": "用于 maveo 车库门应用程序的适配器"
+    },
+    "authors": ["TA2k <tombox2020@gmail.com>"],
+    "keywords": ["maveo", "marantec"],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "main": "main.js",
+    "icon": "maveo.png",
+    "enabled": true,
+    "extIcon": "https://raw.githubusercontent.com/TA2k/ioBroker.maveo/master/admin/maveo.png",
+    "readme": "https://github.com/TA2k/ioBroker.maveo/blob/master/README.md",
+    "loglevel": "info",
+    "mode": "daemon",
+    "type": "household",
+    "compact": true,
+    "connectionType": "cloud",
+    "dataSource": "poll",
+    "materialize": true,
+    "plugins": {
+      "sentry": {
+        "dsn": "https://779383e66a4d4f7a8adb8ed7039dc36d@sentry.iobroker.net/151"
+      }
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=3.0.0"
+      }
+    ],
+    "globalDependencies": [
+      {
+        "admin": ">=4.0.9"
+      }
     ]
+  },
+  "encryptedNative": ["password"],
+  "protectedNative": ["password"],
+  "native": {
+    "username": "",
+    "password": "",
+    "interval": 10
+  },
+  "objects": [],
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": "Information"
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "role": "indicator.connected",
+        "name": "Device or service connected",
+        "type": "boolean",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    }
+  ]
 }
