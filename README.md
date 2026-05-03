@@ -30,7 +30,9 @@ https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 * (TA2k) fix status
 ### 0.0.1
 * (TA2k) initial release
-  
+
+[Older changelogs can be found there](CHANGELOG_OLD.md)
+
 ## License
 MIT License
 
