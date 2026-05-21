@@ -26,6 +26,10 @@ maveo.0.id.remote auf true setzen steuert den jeweiligen Befehl
 https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
+
+### **WORK IN PROGRESS**
+- (ioBroker-Bot) Adapter requires js-controller >= 6.0.11 now.
+
 ### 0.0.4
 * (TA2k) fix status
 ### 0.0.1
