@@ -1,0 +1,100 @@
+{
+  "i18n": true,
+  "type": "panel",
+  "items": {
+    "_header": {
+      "type": "header",
+      "text": "Maveo",
+      "size": 4,
+      "newLine": true
+    },
+    "_intro": {
+      "type": "staticText",
+      "newLine": true,
+      "text": "Two modes: Cloud (Cognito login + nymea proxy) is used by default. Set 'boxIp' to switch to LAN mode (direct JSON-RPC to the box, push-button auth on first start)."
+    },
+
+    "_cloud": {
+      "type": "header",
+      "text": "Cloud mode",
+      "size": 5,
+      "newLine": true
+    },
+    "username": {
+      "type": "text",
+      "label": "App Email",
+      "newLine": true,
+      "sm": 12,
+      "md": 6,
+      "lg": 6
+    },
+    "password": {
+      "type": "password",
+      "label": "App Password",
+      "newLine": true,
+      "sm": 12,
+      "md": 6,
+      "lg": 6,
+      "repeat": false
+    },
+    "region": {
+      "type": "select",
+      "label": "Region",
+      "newLine": true,
+      "sm": 12,
+      "md": 4,
+      "lg": 3,
+      "options": [
+        { "value": "eu", "label": "Europe (eu-central-1)" },
+        { "value": "us", "label": "United States (us-west-2)" }
+      ]
+    },
+    "wakeTopic": {
+      "type": "text",
+      "label": "IoT wake topic (optional)",
+      "newLine": true,
+      "sm": 12,
+      "md": 8,
+      "lg": 8,
+      "help": "AWS IoT topic used to wake the box before connecting to the proxy. Leave empty to skip."
+    },
+
+    "_lan": {
+      "type": "header",
+      "text": "LAN mode (direct connection to the box)",
+      "size": 5,
+      "newLine": true
+    },
+    "_lan_hint": {
+      "type": "staticText",
+      "newLine": true,
+      "text": "As soon as 'Maveo box IP' is set, LAN mode is active and cloud settings above are ignored. On first start you have 60 s to press the yellow button on the back of the box; the token is stored encrypted and reused on subsequent starts."
+    },
+    "boxIp": {
+      "type": "text",
+      "label": "Maveo box IP",
+      "newLine": true,
+      "sm": 12,
+      "md": 6,
+      "lg": 4,
+      "placeholder": "e.g. 192.168.1.42"
+    },
+    "boxPort": {
+      "type": "number",
+      "label": "Port",
+      "min": 1,
+      "max": 65535,
+      "step": 1,
+      "sm": 6,
+      "md": 3,
+      "lg": 2
+    },
+    "boxTls": {
+      "type": "checkbox",
+      "label": "TLS",
+      "sm": 6,
+      "md": 3,
+      "lg": 2
+    }
+  }
+}

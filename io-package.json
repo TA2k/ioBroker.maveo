@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "maveo",
-    "version": "0.0.5",
+    "version": "0.1.0",
     "news": {
+      "0.1.0": {
+        "en": "rewritten against the Marantec cloud backend (region select, real Cognito pool/client IDs, thing/action discovery over the nymea tunnel, working remote controls)",
+        "de": "Adapter komplett gegen die Marantec-Cloud umgeschrieben (Region auswählbar, echte Cognito-Pool/Client-IDs, Thing/Action-Discovery über Nymea-Tunnel, funktionierende Remote-Steuerung)"
+      },
       "0.0.5": {
         "en": "update login keys",
         "de": "Login-Schlüssel aktualisiert",
@@ -87,9 +91,9 @@
     "type": "household",
     "compact": true,
     "connectionType": "cloud",
-    "dataSource": "poll",
+    "dataSource": "push",
     "adminUI": {
-      "config": "materialize"
+      "config": "json"
     },
     "plugins": {
       "sentry": {
@@ -107,12 +111,17 @@
       }
     ]
   },
-  "encryptedNative": ["password"],
-  "protectedNative": ["password"],
+  "encryptedNative": ["password", "localToken"],
+  "protectedNative": ["password", "localToken"],
   "native": {
     "username": "",
     "password": "",
-    "interval": 10
+    "region": "eu",
+    "wakeTopic": "",
+    "boxIp": "",
+    "boxPort": 2222,
+    "boxTls": true,
+    "localToken": ""
   },
   "objects": [],
   "instanceObjects": [
