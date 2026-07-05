@@ -341,6 +341,8 @@ class Maveo extends utils.Adapter {
     const port = Number(this.config.boxPort) || 2222;
     const useTls = this.config.boxTls !== false; // default true, nymea:core listens on SSL by default
 
+    this.log.debug(`LAN connect: host=${host} port=${port} tls=${useTls} tokenStored=${!!this.config.localToken}`);
+
     const onConnect = () => {
       this.log.info(`LAN socket connected to ${host}:${port} (${useTls ? "TLS" : "plain"}).`);
       this.reconnectDelay = 5000;
@@ -349,9 +351,18 @@ class Maveo extends utils.Adapter {
         try { this.lanSocket && this.lanSocket.destroy(); } catch { /* ignore */ }
       });
     };
-    const onData = (chunk) => this.handleMessages(chunk.toString("utf8"));
-    const onClose = () => {
-      this.log.info("LAN socket closed.");
+    const onData = (chunk) => {
+      const text = chunk.toString("utf8");
+      if (this.log.level === "debug" || this.log.level === "silly") {
+        // Keep the log line short so the transcript stays readable, but the
+        // full payload is available on the debug channel when investigating
+        // LAN handshake issues.
+        this.log.debug(`LAN <-- ${text.length} bytes: ${text.slice(0, 400).replace(/\n/g, "\\n")}${text.length > 400 ? "…" : ""}`);
+      }
+      this.handleMessages(text);
+    };
+    const onClose = (hadError) => {
+      this.log.info(`LAN socket closed${hadError ? " (with error)" : ""}.`);
       this.rejectRpcRequests("lan closed");
       this.setStateAsync("info.connection", false, true).catch(() => {});
       this.scheduleReconnect();
@@ -361,21 +372,45 @@ class Maveo extends utils.Adapter {
     if (useTls) {
       // The maveo box ships a self-signed certificate. Skip verification.
       this.lanSocket = tls.connect({ host, port, rejectUnauthorized: false }, onConnect);
+      this.lanSocket.on("secureConnect", () => {
+        const sock = /** @type {tls.TLSSocket} */ (this.lanSocket);
+        try {
+          const cert = sock && sock.getPeerCertificate && sock.getPeerCertificate();
+          const cipher = sock && sock.getCipher && sock.getCipher();
+          const proto = sock && sock.getProtocol && sock.getProtocol();
+          this.log.debug(`LAN TLS ready: proto=${proto} cipher=${cipher && cipher.name} peer=${cert && cert.subject && cert.subject.CN}`);
+        } catch { /* ignore */ }
+      });
     } else {
       this.lanSocket = net.createConnection({ host, port }, onConnect);
     }
     this.lanSocket.on("data", onData);
     this.lanSocket.on("close", onClose);
     this.lanSocket.on("error", onError);
+    this.lanSocket.setTimeout(30000, () => {
+      this.log.warn(`LAN socket idle for 30 s — closing and letting reconnect handle it.`);
+      try { this.lanSocket && this.lanSocket.destroy(new Error("LAN idle timeout")); } catch { /* ignore */ }
+    });
   }
 
   async startLanHandshake() {
     // JSONRPC.Hello establishes protocol version and tells us whether we
     // need to authenticate at all.
+    this.log.debug("LAN handshake: sending JSONRPC.Hello");
     const hello = await this.sendAndAwait({ method: "JSONRPC.Hello", params: { locale: "de_DE" } }, true);
     const helloParams = hello && hello.params || {};
     const needsAuth = helloParams.authenticationRequired !== false;
-    this.log.debug("LAN Hello reply: " + JSON.stringify(helloParams));
+    this.log.info(
+      `LAN Hello reply: server=${helloParams.server || "?"} version=${helloParams.version || "?"} ` +
+      `protocol=${helloParams.protocol || "?"} authRequired=${needsAuth} ` +
+      `pushButton=${helloParams.pushButtonAuthAvailable !== false} ` +
+      `initialSetup=${!!helloParams.initialSetupRequired}`
+    );
+    this.log.debug("LAN Hello full reply: " + JSON.stringify(helloParams));
+
+    if (helloParams.initialSetupRequired) {
+      throw new Error("Box reports initialSetupRequired=true — set the box up in the maveo app first, then try again.");
+    }
 
     if (needsAuth) {
       let token = this.config.localToken || "";
@@ -383,22 +418,31 @@ class Maveo extends utils.Adapter {
         if (helloParams.pushButtonAuthAvailable === false) {
           throw new Error("Box requires authentication but does not offer push-button auth.");
         }
-        this.log.warn("No token yet — starting push-button auth. Press the yellow button on the maveo box within 30 seconds.");
-        token = await this.pushButtonAuth();
+        this.log.warn("No token yet — starting push-button auth. Press the yellow button on the maveo box within 60 seconds.");
+        try {
+          token = await this.pushButtonAuth();
+        } catch (err) {
+          this.log.error("Push-button auth failed: " + this.errorText(err));
+          throw err;
+        }
         // Persist token so the next start is silent.
         try {
           await this.updateConfig({ localToken: token });
           this.config.localToken = token;
+          this.log.info("Push-button auth succeeded, token persisted to instance config.");
         } catch (err) {
-          this.log.warn("Could not persist localToken to config: " + this.errorText(err));
+          this.log.warn("Push-button auth succeeded but persisting token to config failed: " + this.errorText(err));
         }
-        this.log.info("Push-button auth succeeded, token stored.");
+      } else {
+        this.log.debug("Reusing stored localToken (length=" + token.length + ").");
       }
       this.rpcToken = token;
     } else {
+      this.log.info("Box does not require authentication.");
       this.rpcToken = null;
     }
 
+    this.log.debug("LAN handshake: enabling notifications");
     await this.sendAndAwait({
       method: "JSONRPC.SetNotificationStatus",
       // The nymea reference implementation (HA custom_component maveo_box.py)
@@ -407,8 +451,10 @@ class Maveo extends utils.Adapter {
       params: { enabled: true },
     });
 
+    this.log.debug("LAN handshake: initTopology");
     await this.initTopology();
     await this.setStateAsync("info.connection", true, true);
+    this.log.info("LAN handshake complete.");
   }
 
   pushButtonAuth() {
@@ -454,9 +500,11 @@ class Maveo extends utils.Adapter {
           return;
         }
         pending.transactionId = txId;
+        this.log.info(`Push-button auth started (txId=${txId}). WAITING FOR BUTTON PRESS on the maveo box.`);
         // Drain any notifications that arrived before we knew the txId.
         /** @type {any[]} */
         const early = pending.earlyNotifications.splice(0);
+        if (early.length) this.log.debug(`Draining ${early.length} early push-button notification(s).`);
         for (const params of early) this.deliverPushButton(params);
       }).catch((err) => settle(() => reject(err)));
 
@@ -559,8 +607,10 @@ class Maveo extends utils.Adapter {
       delete this.rpcRequests[msg.id];
       clearTimeout(req.timeout);
       if (msg.status === "error") {
+        this.log.debug(`<-- id=${msg.id} ERROR: ${JSON.stringify(msg.error || msg.params || msg).slice(0, 400)}`);
         req.reject(new Error("Nymea error reply for id " + msg.id + ": " + JSON.stringify(msg.error || msg.params || msg)));
       } else {
+        this.log.debug(`<-- id=${msg.id} OK`);
         req.resolve(msg);
       }
       return;
@@ -569,6 +619,10 @@ class Maveo extends utils.Adapter {
     if (msg.status === "error") {
       this.log.error("Reply error: " + JSON.stringify(msg));
       return;
+    }
+
+    if (msg.notification) {
+      this.log.debug(`<-- notification: ${msg.notification}`);
     }
 
     // Cloud only: after Authenticate the proxy notifies us to start
@@ -581,6 +635,7 @@ class Maveo extends utils.Adapter {
     }
 
     if (msg.notification === "JSONRPC.PushButtonAuthFinished" && msg.params) {
+      this.log.info(`Push-button notification received: success=${msg.params.success} txId=${msg.params.transactionId}`);
       this.deliverPushButton(msg.params);
       return;
     }
@@ -606,8 +661,13 @@ class Maveo extends utils.Adapter {
     }
     const classes = await this.sendAndAwait({ method: "Integrations.GetThingClasses" });
     this.ingestThingClasses(classes && classes.params);
+    this.log.info(`Ingested ${Object.keys(this.thingClasses).length} thing classes, ${Object.keys(this.stateTypes).length} state types.`);
     const things = await this.sendAndAwait({ method: "Integrations.GetThings" });
     const list = things && things.params && Array.isArray(things.params.things) ? things.params.things : [];
+    this.log.info(`GetThings returned ${list.length} thing(s).`);
+    for (const thing of list) {
+      this.log.debug(`  thing id=${thing.id} name="${thing.name}" thingClassId=${thing.thingClassId} setupComplete=${thing.setupComplete}`);
+    }
     await this.ingestThings(things && things.params);
 
     if (list.length === 0) {
@@ -639,6 +699,11 @@ class Maveo extends utils.Adapter {
 
   sendRaw(payload) {
     const line = JSON.stringify(payload) + "\n";
+    // Do not log token=<jwt> at info level; strip it for debug.
+    const scrub = { ...payload };
+    if (scrub.token) scrub.token = "<hidden>";
+    if (scrub.params && scrub.params.token) scrub.params = { ...scrub.params, token: "<hidden>" };
+    this.log.debug(`--> ${JSON.stringify(scrub).slice(0, 400)}`);
     if (this.mode === "cloud") {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         this.log.debug("WS not open, dropping " + payload.method);
@@ -660,6 +725,7 @@ class Maveo extends utils.Adapter {
       const timeout = setTimeout(() => {
         if (this.rpcRequests[id]) {
           delete this.rpcRequests[id];
+          this.log.warn(`Nymea call timed out: ${payload.method} (id=${id})`);
           reject(new Error("Nymea call timed out: " + payload.method));
         }
       }, 30000);
@@ -757,7 +823,12 @@ class Maveo extends utils.Adapter {
   async applyStateChange(params) {
     const thingId = params.thingId;
     const stateType = this.stateTypes[params.stateTypeId];
-    if (!thingId || !stateType) return;
+    if (!thingId || !stateType) {
+      this.log.debug(`StateChanged for unknown thing/stateType: thingId=${thingId} stateTypeId=${params.stateTypeId}`);
+      return;
+    }
+    const name = stateType.displayName || stateType.name || stateType.id;
+    this.log.debug(`StateChanged ${thingId}.${name} = ${JSON.stringify(params.value)}`);
     await this.setObjectNotExistsAsync(thingId, { type: "device", common: { name: thingId }, native: {} });
     await this.upsertStateObject(thingId, stateType);
     await this.setStateAsync(thingId + "." + stateType.id, {
@@ -818,6 +889,7 @@ class Maveo extends utils.Adapter {
       this.log.warn(`No actionType for ${thingId}.remote.${command}`);
       return;
     }
+    this.log.info(`Sending ExecuteAction: thingId=${thingId} action=${command} (${actionTypeId})`);
     try {
       const reply = await this.sendAndAwait({
         method: "Integrations.ExecuteAction",
