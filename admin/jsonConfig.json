@@ -4,97 +4,172 @@
   "items": {
     "_header": {
       "type": "header",
-      "text": "Maveo",
+      "text": {
+        "en": "Maveo",
+        "de": "Maveo"
+      },
       "size": 4,
       "newLine": true
     },
     "_intro": {
       "type": "staticText",
       "newLine": true,
-      "text": "Two modes: Cloud (Cognito login + nymea proxy) is used by default. Set 'boxIp' to switch to LAN mode (direct JSON-RPC to the box, push-button auth on first start)."
+      "text": {
+        "en": "Two modes: Cloud (Cognito login + nymea proxy) is used by default. Set 'boxIp' to switch to LAN mode (direct JSON-RPC to the box, push-button auth on first start).",
+        "de": "Zwei Modi: Cloud (Cognito-Login + Nymea-Proxy) ist Standard. 'boxIp' setzen, um in den LAN-Modus zu wechseln (direkte JSON-RPC-Verbindung zur Box, Push-Button-Auth beim ersten Start)."
+      },
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12
     },
 
     "_cloud": {
       "type": "header",
-      "text": "Cloud mode",
+      "text": {
+        "en": "Cloud mode",
+        "de": "Cloud-Modus"
+      },
       "size": 5,
       "newLine": true
     },
     "username": {
       "type": "text",
-      "label": "App Email",
+      "label": {
+        "en": "App Email",
+        "de": "App-E-Mail"
+      },
       "newLine": true,
-      "sm": 12,
-      "md": 6,
-      "lg": 6
-    },
-    "password": {
-      "type": "password",
-      "label": "App Password",
-      "newLine": true,
+      "xs": 12,
       "sm": 12,
       "md": 6,
       "lg": 6,
+      "xl": 6
+    },
+    "password": {
+      "type": "password",
+      "label": {
+        "en": "App Password",
+        "de": "App-Passwort"
+      },
+      "newLine": true,
+      "xs": 12,
+      "sm": 12,
+      "md": 6,
+      "lg": 6,
+      "xl": 6,
       "repeat": false
     },
     "region": {
       "type": "select",
-      "label": "Region",
+      "label": {
+        "en": "Region",
+        "de": "Region"
+      },
       "newLine": true,
+      "xs": 12,
       "sm": 12,
       "md": 4,
       "lg": 3,
+      "xl": 3,
       "options": [
-        { "value": "eu", "label": "Europe (eu-central-1)" },
-        { "value": "us", "label": "United States (us-west-2)" }
+        {
+          "value": "eu",
+          "label": {
+            "en": "Europe (eu-central-1)",
+            "de": "Europa (eu-central-1)"
+          }
+        },
+        {
+          "value": "us",
+          "label": {
+            "en": "United States (us-west-2)",
+            "de": "USA (us-west-2)"
+          }
+        }
       ]
     },
     "wakeTopic": {
       "type": "text",
-      "label": "IoT wake topic (optional)",
+      "label": {
+        "en": "IoT wake topic (optional)",
+        "de": "IoT-Wake-Topic (optional)"
+      },
       "newLine": true,
+      "xs": 12,
       "sm": 12,
       "md": 8,
       "lg": 8,
-      "help": "AWS IoT topic used to wake the box before connecting to the proxy. Leave empty to skip."
+      "xl": 8,
+      "help": {
+        "en": "AWS IoT topic used to wake the box before connecting to the proxy. Leave empty to skip.",
+        "de": "AWS-IoT-Topic zum Aufwecken der Box vor dem Verbindungsaufbau. Leer lassen, um zu überspringen."
+      }
     },
 
     "_lan": {
       "type": "header",
-      "text": "LAN mode (direct connection to the box)",
+      "text": {
+        "en": "LAN mode (direct connection to the box)",
+        "de": "LAN-Modus (direkte Verbindung zur Box)"
+      },
       "size": 5,
       "newLine": true
     },
     "_lan_hint": {
       "type": "staticText",
       "newLine": true,
-      "text": "As soon as 'Maveo box IP' is set, LAN mode is active and cloud settings above are ignored. On first start you have 60 s to press the yellow button on the back of the box; the token is stored encrypted and reused on subsequent starts."
+      "text": {
+        "en": "As soon as 'Maveo box IP' is set, LAN mode is active and cloud settings above are ignored. On first start you have 60 s to press the yellow button on the back of the box; the token is stored encrypted and reused on subsequent starts.",
+        "de": "Sobald 'Maveo-Box-IP' gesetzt ist, ist der LAN-Modus aktiv und die Cloud-Einstellungen oben werden ignoriert. Beim ersten Start hast du 60 s Zeit, die gelbe Taste auf der Rückseite der Box zu drücken; der Token wird verschlüsselt gespeichert und bei weiteren Starts wiederverwendet."
+      },
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12
     },
     "boxIp": {
       "type": "text",
-      "label": "Maveo box IP",
+      "label": {
+        "en": "Maveo box IP",
+        "de": "Maveo-Box-IP"
+      },
       "newLine": true,
+      "xs": 12,
       "sm": 12,
       "md": 6,
       "lg": 4,
+      "xl": 4,
       "placeholder": "e.g. 192.168.1.42"
     },
     "boxPort": {
       "type": "number",
-      "label": "Port",
+      "label": {
+        "en": "Port",
+        "de": "Port"
+      },
       "min": 1,
       "max": 65535,
       "step": 1,
+      "xs": 12,
       "sm": 6,
       "md": 3,
-      "lg": 2
+      "lg": 2,
+      "xl": 2
     },
     "boxTls": {
       "type": "checkbox",
-      "label": "TLS",
+      "label": {
+        "en": "TLS",
+        "de": "TLS"
+      },
+      "xs": 12,
       "sm": 6,
       "md": 3,
-      "lg": 2
+      "lg": 2,
+      "xl": 2
     }
   }
 }

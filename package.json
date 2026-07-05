@@ -16,8 +16,7 @@
   "keywords": [
     "ioBroker",
     "maveo",
-    "marantec",
-    "ioBroker"
+    "marantec"
   ],
   "engines": {
     "node": ">=22"
@@ -38,7 +37,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@iobroker/testing": "^5.2.2",
-    "@types/node": "^20.19.0",
+    "@tsconfig/node22": "^22.0.5",
+    "@types/node": "^22.10.5",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
     "typescript": "~6.0.3"

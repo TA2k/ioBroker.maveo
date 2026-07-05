@@ -10,72 +10,83 @@
 
 **Tests:** ![Test and Release](https://github.com/TA2k/ioBroker.maveo/workflows/Test%20and%20Release/badge.svg)
 
-## maveo Adapter für ioBroker
+## maveo adapter for ioBroker
 
-Adapter für die maveo Garagentor-Systeme der Firma Marantec. Zwei Betriebsmodi:
+Adapter for the maveo garage door systems by Marantec. Two operating modes:
 
-- **Cloud-Modus (default)** — Login über die Marantec-Cloud (Amazon Cognito),
-  Steuerung über den Nymea-Tunnel `wss://remoteproxy.nymea.io`.
-  Setzt voraus, dass die Box in der maveo-App **per Bluetooth-Onboarding**
-  gepairt wurde (die App schreibt dabei die Cognito Identity ID in die Box).
-  Wenn die Box "nur lokal" hinzugefügt wurde, ist die Cloud-Device-Liste leer –
-  in dem Fall stellt der Adapter im Log darauf hin und du kannst auf LAN-Modus
-  umschalten.
-- **LAN-Modus** — direkte JSON-RPC-Verbindung zur Box (`<boxIp>:2222` per TLS
-  standardmäßig). Beim ersten Start wird per Push-Button-Auth authentifiziert:
-  gelbe Taste hinten an der maveo-Box innerhalb von 60 s drücken, der erhaltene
-  Token wird im Adapter gespeichert. Funktioniert unabhängig vom Cognito-Konto
-  und ist die zuverlässige Variante, wenn die Box im lokalen Netz erreichbar ist.
+- **Cloud mode (default)** — login against the Marantec cloud (Amazon Cognito),
+  control through the Nymea tunnel `wss://remoteproxy.nymea.io`.
+  Requires the box to be paired **via Bluetooth onboarding** in the maveo app
+  (the app writes the Cognito Identity ID into the box during onboarding).
+  If the box was only added locally, the cloud device list is empty; in that
+  case the adapter tells you so in the log and you can switch to LAN mode.
+- **LAN mode** — direct JSON-RPC connection to the box (`<boxIp>:2222` over
+  TLS by default). On first start push-button authentication is performed:
+  press the yellow button on the back of the maveo box within 60 s. The
+  resulting token is stored in the adapter. Works independently of the
+  Cognito account and is the reliable option when the box is reachable on
+  the local network.
 
-Alle Zustände (Position, Bewegung, Sensoren) kommen in beiden Modi als
-Push-Notifikation über `Integrations.StateChanged`, das Öffnen/Schließen erfolgt
-über `Integrations.ExecuteAction`.
+State updates (position, movement, sensors) arrive as push notifications in
+both modes via `Integrations.StateChanged`; open/close is issued via
+`Integrations.ExecuteAction`.
 
-## Konfiguration
+## Configuration
 
-| Feld | Bedeutung | Default |
+| Field | Meaning | Default |
 |---|---|---|
-| `App Email` / `App Password` | Zugangsdaten aus der maveo-App (nur Cloud-Modus) | — |
-| `Region` | `eu` (Europa) oder `us` (USA) | `eu` |
-| `IoT wake topic` | Optionales AWS-IoT-Topic zum Aufwecken der Box | leer |
-| `Maveo box IP` | LAN-Modus aktivieren, sobald gesetzt | leer |
-| `Port` | JSON-RPC Port | 2222 |
-| `TLS` | SSL für den JSON-RPC-Socket | an |
+| `App Email` / `App Password` | Credentials of the maveo app (cloud mode only) | — |
+| `Region` | `eu` (Europe) or `us` (USA) | `eu` |
+| `IoT wake topic` | Optional AWS IoT topic used to wake the box | empty |
+| `Maveo box IP` | Enables LAN mode when set | empty |
+| `Port` | JSON-RPC port | 2222 |
+| `TLS` | SSL for the JSON-RPC socket | on |
 
-Die Cognito-Pool- und Client-IDs sowie die IoT-Endpunkte sind fest aus der
-maveo-App 2.6.1 hinterlegt und regionabhängig. Der lokale Push-Button-Token
-wird verschlüsselt in `native.localToken` abgelegt.
+The Cognito pool/client IDs and IoT endpoints are hard-coded from the maveo
+app 2.6.1 and region-dependent. The local push-button token is stored
+encrypted in `native.localToken`.
 
-## Steuerung
+## Control
 
-Für jedes Thing werden unter `maveo.<inst>.<thingId>.remote.<action>` schreib-
-bare States angelegt (z. B. `open`, `close`). Setzen auf einen beliebigen Wert
-löst `Integrations.ExecuteAction` aus. Statusänderungen kommen automatisch als
-Push-Update in `maveo.<inst>.<thingId>.<stateTypeId>`.
+For each thing the adapter creates writable states under
+`maveo.<inst>.<thingId>.remote.<action>` (for example `open`, `close`).
+Writing any value to such a state issues `Integrations.ExecuteAction`.
+State changes come in automatically as push updates in
+`maveo.<inst>.<thingId>.<stateTypeId>`.
 
-## Diskussion und Fragen
+## Discussion
 
 https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
+
 ### 0.1.0
-* Zwei Betriebsmodi: Cloud (Cognito + Nymea-Tunnel) und LAN (direkt zur Box mit
-  Push-Button-Auth). Region wählbar (EU/US). Cognito-Pool/Client-IDs und
-  Cloud-Endpunkte aus der maveo-App 2.6.1 verifiziert (Ghidra-Decompile).
-  Thing/Action-Discovery über Nymea, Push-basierte State-Updates, funktionierende
-  Remote-Steuerung, Message-Buffering und exponentielles Reconnect-Backoff.
+
+* Two operating modes: cloud (Cognito + Nymea tunnel) and LAN (direct
+  connection to the box with push-button auth). Region selectable (EU/US).
+  Cognito pool/client IDs and cloud endpoints verified against the maveo app
+  2.6.1 (Ghidra decompile). Thing/action discovery over Nymea, push-based
+  state updates, working remote control, message buffering and exponential
+  reconnect back-off.
+
 ### 0.0.5
+
 * (TA2k) update login keys
+
 ### 0.0.4
+
 * (TA2k) fix status
+
 ### 0.0.1
+
 * (TA2k) initial release
 
 ## Sentry
 
-Dieser Adapter verwendet die Sentry-Bibliotheken, um Ausnahmen und Fehler
-automatisch an den Entwickler zu melden. Details und Deaktivierung siehe
-[Sentry-Plugin Documentation](https://github.com/ioBroker/plugin-sentry).
+This adapter uses the Sentry libraries to automatically report exceptions and
+code errors to the developer. For more details and for information on how to
+disable the error reporting see
+[Sentry Plugin Documentation](https://github.com/ioBroker/plugin-sentry).
 
 ## License
 
