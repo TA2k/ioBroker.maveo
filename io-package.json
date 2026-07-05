@@ -82,6 +82,7 @@
     "extIcon": "https://raw.githubusercontent.com/TA2k/ioBroker.maveo/master/admin/maveo.png",
     "readme": "https://github.com/TA2k/ioBroker.maveo/blob/master/README.md",
     "loglevel": "info",
+    "tier": 2,
     "mode": "daemon",
     "type": "household",
     "compact": true,
