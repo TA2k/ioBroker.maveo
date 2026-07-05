@@ -11,7 +11,7 @@ const axios = require("axios").default;
 const WebSocket = require("ws");
 const { v4: uuidv4 } = require("uuid");
 const aws4 = require("aws4");
-const Json2iob = require("./lib/json2iob");
+const Json2iob = require("json2iob");
 const AmazonCognitoIdentity = require("amazon-cognito-identity-js");
 
 class Maveo extends utils.Adapter {
@@ -34,6 +34,8 @@ class Maveo extends utils.Adapter {
     this.updateInterval = null;
     this.reLoginTimeout = null;
     this.refreshTokenTimeout = null;
+    this.refreshTokenInterval = null;
+    this.reconnectTimeout = null;
     this.json2iob = new Json2iob(this);
     this.deviceArray = [];
   }
@@ -55,13 +57,13 @@ class Maveo extends utils.Adapter {
       await this.getDeviceList();
       await this.connectToWS();
 
-      this.refreshTokenInterval = setInterval(() => {
+      this.refreshTokenInterval = this.setInterval(() => {
         this.refreshToken();
       }, 3500 * 1000);
     }
   }
   async login() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const authenticationData = {
         Username: this.config.username,
         Password: this.config.password,
@@ -266,8 +268,8 @@ class Maveo extends utils.Adapter {
     this.ws.on("message", async (data, isBinary) => {
       const message = isBinary ? data : data.toString();
       // this.log.debug("WS received:" + message);
-      this.reconnectTimeout && clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout && this.clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = this.setTimeout(() => {
         this.log.info("WS reconnecting");
         this.reconnecing = true;
         this.connectToWS();
@@ -287,7 +289,7 @@ class Maveo extends utils.Adapter {
             parsed = JSON.parse(this.currentMessage);
             this.log.debug(`Parsed successfully: ${parsed.id}`);
           }
-        } catch (error) {
+        } catch {
           this.log.debug("Parsing failed wait for next message " + message.substring(0, 15));
           if (messageArray <= 2) {
             return;
@@ -334,19 +336,19 @@ class Maveo extends utils.Adapter {
           this.stateTypes = {};
           const reply = parsed.params;
           for (let i = 0; i < reply.thingClasses.length; i++) {
-            let thingClass = reply.thingClasses[i];
+            const thingClass = reply.thingClasses[i];
             // Convert stateTypes from a list to a map for easier lookup
-            let stateTypes = {};
+            const stateTypes = {};
             for (let j = 0; j < thingClass.stateTypes.length; j++) {
-              let stateType = thingClass.stateTypes[j];
+              const stateType = thingClass.stateTypes[j];
               stateTypes[stateType.id] = stateType;
             }
             thingClass.stateTypes = stateTypes;
             this.stateTypes = { ...this.stateTypes, ...stateTypes };
             // Convert actionTyes from a list to a map or easier lookup
-            let actionTypes = {};
+            const actionTypes = {};
             for (let j = 0; j < thingClass.actionTypes.length; j++) {
-              let actionType = thingClass.actionTypes[j];
+              const actionType = thingClass.actionTypes[j];
               actionTypes[actionType.id] = actionType;
             }
             thingClass.actionTypes = actionTypes;
@@ -359,12 +361,11 @@ class Maveo extends utils.Adapter {
           const reply = parsed.params;
           for (let i = 0; i < reply.things.length; i++) {
             this.things[reply.things[i].id] = reply.things[i];
-            let thing = reply.things[i];
-            let thingClass = this.thingClasses[thing.thingClassId];
+            const thing = reply.things[i];
             // Convert states from a list to a map for easier lookup
-            let states = {};
+            const states = {};
             for (let j = 0; j < thing.states.length; j++) {
-              let state = thing.states[j];
+              const state = thing.states[j];
               states[state.stateTypeId] = state;
             }
             thing["states"] = states;
@@ -383,7 +384,7 @@ class Maveo extends utils.Adapter {
             const stateTypeId = parsed.params.stateTypeId;
             const stateType = this.stateTypes[stateTypeId];
             this.log.debug(JSON.stringify(stateType));
-            let unit = stateType.unit === "UnitNone" ? null : stateType.unit.replace("Unit", "");
+            const unit = stateType.unit === "UnitNone" ? null : stateType.unit.replace("Unit", "");
 
             await this.setObjectNotExistsAsync(parsed.params.thingId, {
               type: "device",
@@ -464,7 +465,7 @@ class Maveo extends utils.Adapter {
     });
   }
   sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolve) => this.setTimeout(() => resolve(undefined), ms));
   }
   amzDate() {
     return new Date().toISOString().slice(0, 20).replace(/-/g, "").replace(/:/g, "").replace(/\./g, "") + "Z";
@@ -476,13 +477,13 @@ class Maveo extends utils.Adapter {
   onUnload(callback) {
     try {
       this.setState("info.connection", false, true);
-      clearTimeout(this.refreshTimeout);
-      clearTimeout(this.reLoginTimeout);
-      clearTimeout(this.refreshTokenTimeout);
-      clearInterval(this.updateInterval);
-      clearInterval(this.refreshTokenInterval);
+      this.reLoginTimeout && this.clearTimeout(this.reLoginTimeout);
+      this.refreshTokenTimeout && this.clearTimeout(this.refreshTokenTimeout);
+      this.reconnectTimeout && this.clearTimeout(this.reconnectTimeout);
+      this.updateInterval && this.clearInterval(this.updateInterval);
+      this.refreshTokenInterval && this.clearInterval(this.refreshTokenInterval);
       callback();
-    } catch (e) {
+    } catch {
       callback();
     }
   }
@@ -495,7 +496,9 @@ class Maveo extends utils.Adapter {
   async onStateChange(id, state) {
     if (state) {
       if (!state.ack) {
+        // eslint-disable-next-line no-unused-vars
         const deviceId = id.split(".")[2];
+        // eslint-disable-next-line no-unused-vars
         const command = id.split(".")[4];
         const data = {};
         this.log.debug(JSON.stringify(data));

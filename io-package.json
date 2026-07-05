@@ -4,10 +4,30 @@
     "version": "0.0.5",
     "news": {
       "0.0.5": {
-        "en": "update login keys"
+        "en": "update login keys",
+        "de": "Login-Schlüssel aktualisiert",
+        "ru": "обновление ключей входа",
+        "pt": "atualizar chaves de login",
+        "nl": "login-sleutels bijgewerkt",
+        "fr": "mise à jour des clés de connexion",
+        "it": "aggiornamento delle chiavi di accesso",
+        "es": "actualizar las claves de acceso",
+        "pl": "aktualizacja kluczy logowania",
+        "uk": "оновлення ключів входу",
+        "zh-cn": "更新登录密钥"
       },
       "0.0.4": {
-        "en": "fix status"
+        "en": "fix status",
+        "de": "Status-Fix",
+        "ru": "исправление статуса",
+        "pt": "corrigir status",
+        "nl": "status corrigeren",
+        "fr": "correction du statut",
+        "it": "correzione dello stato",
+        "es": "corregir el estado",
+        "pl": "poprawka statusu",
+        "uk": "виправлення статусу",
+        "zh-cn": "修复状态"
       },
       "0.0.3": {
         "en": "initial release",
@@ -19,10 +39,10 @@
         "it": "Versione iniziale",
         "es": "Versión inicial",
         "pl": "Pierwsze wydanie",
+        "uk": "Початковий випуск",
         "zh-cn": "首次出版"
       }
     },
-    "title": "Maveo",
     "titleLang": {
       "en": "Maveo",
       "de": "Maveo",
@@ -33,6 +53,7 @@
       "it": "Maveo",
       "es": "Maveo",
       "pl": "Maveo",
+      "uk": "Мавео",
       "zh-cn": "马威奥"
     },
     "desc": {
@@ -45,13 +66,17 @@
       "it": "Adattatore per app maveo garagedoor",
       "es": "Adaptador para la aplicación maveo garagedoor",
       "pl": "Adapter do aplikacji bram garażowych maveo",
+      "uk": "Адаптер для додатка гаражних воріт maveo",
       "zh-cn": "用于 maveo 车库门应用程序的适配器"
     },
     "authors": ["TA2k <tombox2020@gmail.com>"],
     "keywords": ["maveo", "marantec"],
-    "license": "MIT",
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free"
+    },
+    "tier": 3,
     "platform": "Javascript/Node.js",
-    "main": "main.js",
     "icon": "maveo.png",
     "enabled": true,
     "extIcon": "https://raw.githubusercontent.com/TA2k/ioBroker.maveo/master/admin/maveo.png",
@@ -62,7 +87,9 @@
     "compact": true,
     "connectionType": "cloud",
     "dataSource": "poll",
-    "materialize": true,
+    "adminUI": {
+      "config": "materialize"
+    },
     "plugins": {
       "sentry": {
         "dsn": "https://779383e66a4d4f7a8adb8ed7039dc36d@sentry.iobroker.net/151"
@@ -70,12 +97,12 @@
     },
     "dependencies": [
       {
-        "js-controller": ">=3.0.0"
+        "js-controller": ">=6.0.11"
       }
     ],
     "globalDependencies": [
       {
-        "admin": ">=4.0.9"
+        "admin": ">=7.6.20"
       }
     ]
   },

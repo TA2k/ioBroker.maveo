@@ -26,15 +26,20 @@ maveo.0.id.remote auf true setzen steuert den jeweiligen Befehl
 https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
+### 0.0.5
+* (TA2k) update login keys
 ### 0.0.4
 * (TA2k) fix status
 ### 0.0.1
 * (TA2k) initial release
   
+## Sentry
+This adapter uses the Sentry libraries to automatically report exceptions and code errors to the developer. For more details and for information how to disable the error reporting see [Sentry-Plugin Documentation](https://github.com/ioBroker/plugin-sentry#plugin-sentry)! Sentry reporting is used starting with js-controller 3.0.
+
 ## License
 MIT License
 
-Copyright (c) 2021 TA2k <tombox2020@gmail.com>
+Copyright (c) 2021-2026 TA2k <tombox2020@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
