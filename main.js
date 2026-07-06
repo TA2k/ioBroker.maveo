@@ -357,8 +357,15 @@ class Maveo extends utils.Adapter {
     const host = (this.config.boxIp || "").trim();
     const explicitPort = Number(this.config.boxPort) || 0;
     const useTls = this.config.boxTls !== false;
+    const useWs = !!this.config.boxWs;
     const attempts = explicitPort
-      ? [{ kind: this.config.boxWs ? "ws" : "tcp", port: explicitPort, tls: useTls }]
+      // With an explicit port we still probe both TLS variants of the chosen
+      // transport (TCP or WS) so a port that speaks plain does not need a
+      // second configuration round-trip.
+      ? [
+        { kind: useWs ? "ws" : "tcp", port: explicitPort, tls: useTls },
+        { kind: useWs ? "ws" : "tcp", port: explicitPort, tls: !useTls },
+      ]
       : [
         { kind: "tcp", port: 2222, tls: useTls },
         { kind: "ws",  port: 4444, tls: useTls },
@@ -457,8 +464,13 @@ class Maveo extends utils.Adapter {
       this.lanSocket.on("data", onData);
       this.lanSocket.on("close", onClose);
       this.lanSocket.on("error", onError);
-      this.lanSocket.setTimeout(30000, () => {
-        this.log.warn(`LAN socket idle for 30 s — closing and letting reconnect handle it.`);
+      // Short handshake timeout during the probe phase so a port that
+      // accepts TCP but does not answer at the JSON-RPC layer (typical for
+      // plain-TCP ports mistakenly probed with TLS) fails over in seconds
+      // instead of after 30 s.
+      const idleMs = this.probeActive ? 5000 : 30000;
+      this.lanSocket.setTimeout(idleMs, () => {
+        this.log.warn(`LAN socket idle for ${idleMs / 1000} s — closing and letting reconnect handle it.`);
         try { this.lanSocket && this.lanSocket.destroy(new Error("LAN idle timeout")); } catch { /* ignore */ }
       });
     } else {
