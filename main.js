@@ -366,11 +366,15 @@ class Maveo extends utils.Adapter {
         { kind: useWs ? "ws" : "tcp", port: explicitPort, tls: useTls },
         { kind: useWs ? "ws" : "tcp", port: explicitPort, tls: !useTls },
       ]
+      // Auto-probe order matches the maveo/nymea documentation:
+      //   TCP plain 2222, TCP+TLS 2223, WS plain 4445, WS+TLS 4444.
+      // The maveo box exposes all four when local nymea:core access is
+      // enabled in the app ("Third-party connection" / "Local API").
       : [
-        { kind: "tcp", port: 2222, tls: useTls },
-        { kind: "ws",  port: 4444, tls: useTls },
         { kind: "tcp", port: 2222, tls: false },
-        { kind: "ws",  port: 4444, tls: false },
+        { kind: "tcp", port: 2223, tls: true },
+        { kind: "ws",  port: 4444, tls: true },
+        { kind: "ws",  port: 4445, tls: false },
       ];
 
     this.log.debug(`LAN connect: host=${host} attempts=${JSON.stringify(attempts)} tokenStored=${!!this.config.localToken}`);
