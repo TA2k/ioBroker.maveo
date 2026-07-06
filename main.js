@@ -492,6 +492,12 @@ class Maveo extends utils.Adapter {
       this.log.info(`LAN connected to ${host}:${attempt.port} via ${label}.`);
       this.reconnectDelay = 5000;
       this.probeActive = false;
+      // Handshake / push-button auth can legitimately take up to 60 s while
+      // the user walks to the box; lift the aggressive probe timeout now that
+      // we are past the TLS handshake.
+      if (this.lanSocket && typeof this.lanSocket.setTimeout === "function") {
+        this.lanSocket.setTimeout(0);
+      }
       this.startLanHandshake().catch((err) => {
         this.log.error("LAN handshake failed: " + this.errorText(err));
         try {
@@ -550,9 +556,11 @@ class Maveo extends utils.Adapter {
       // Short handshake timeout during the probe phase so a port that
       // accepts TCP but does not answer at the JSON-RPC layer (typical for
       // plain-TCP ports mistakenly probed with TLS) fails over in seconds
-      // instead of after 30 s.
+      // instead of after 30 s. Cleared in onConnect() once we are past the
+      // TLS handshake so push-button auth (up to 60 s) is not cut short.
       const idleMs = this.probeActive ? 5000 : 30000;
       this.lanSocket.setTimeout(idleMs, () => {
+        if (!this.probeActive) return; // handshake succeeded — ignore.
         this.log.warn(`LAN socket idle for ${idleMs / 1000} s — closing and letting reconnect handle it.`);
         try { this.lanSocket && this.lanSocket.destroy(new Error("LAN idle timeout")); } catch { /* ignore */ }
       });
