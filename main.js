@@ -340,6 +340,11 @@ class Maveo extends utils.Adapter {
 
   connectLan() {
     if (this.destroyed) return;
+    const host = (this.config.boxIp || "").trim();
+    if (!host) {
+      this.log.error("LAN mode requested but 'boxIp' is empty — set the maveo box IP in the adapter settings.");
+      return;
+    }
     // Try mDNS first — if the box announces _jsonrpc._tcp / _ws._tcp we get
     // the real port + sslEnabled flag without guessing. Falls through to the
     // static probe list within 3 s if nothing answers.
@@ -361,16 +366,44 @@ class Maveo extends utils.Adapter {
         return resolve(hits);
       }
 
-      const tryAddService = (service) => {
-        if (!service || !service.port) return;
-        const addrs = Array.isArray(service.addresses) ? service.addresses : [];
-        if (host && !addrs.includes(host)) return;
-        const sslEnabled = service.txt && (service.txt.sslEnabled === "true" || service.txt.sslenabled === "true");
-        hits.push({ kind: service.type === "ws" ? "ws" : "tcp", port: service.port, tls: !!sslEnabled });
-        this.log.info(`mDNS: ${service.type} on ${(addrs[0] || service.host)}:${service.port} tls=${!!sslEnabled}`);
+      let stopped = false;
+
+      /**
+       * mDNS TXT records land as either an object with lowercase keys
+       * (bonjour-service default) or with the original casing depending on
+       * the recorder. Accept both, tolerate a plain boolean, and case-fold
+       * to be safe. When the flag is missing, fall back to the well-known
+       * nymea port assignment (2223 TCP-TLS, 4444 WS-TLS).
+       * @param {any} txt
+       * @param {string} kind
+       * @param {number} port
+       */
+      const detectTls = (txt, kind, port) => {
+        if (txt && typeof txt === "object") {
+          for (const [k, v] of Object.entries(txt)) {
+            if (k.toLowerCase() !== "sslenabled") continue;
+            if (typeof v === "boolean") return v;
+            if (typeof v === "string") return v.toLowerCase() === "true" || v === "1";
+          }
+        }
+        if (kind === "tcp") return port === 2223;
+        if (kind === "ws")  return port === 4444;
+        return false;
       };
 
-      let stopped = false;
+      /** @param {any} service */
+      const tryAddService = (service) => {
+        if (stopped || !service || !service.port) return;
+        const addrs = Array.isArray(service.addresses) ? service.addresses : [];
+        if (host && !addrs.includes(host)) return;
+        const kind = service.type === "ws" ? "ws" : "tcp";
+        const sslEnabled = detectTls(service.txt, kind, service.port);
+        const key = `${kind}:${service.port}:${sslEnabled}`;
+        if (hits.some((h) => `${h.kind}:${h.port}:${h.tls}` === key)) return;
+        hits.push({ kind, port: service.port, tls: sslEnabled });
+        this.log.info(`mDNS: ${service.type} on ${(addrs[0] || service.host)}:${service.port} tls=${sslEnabled}`);
+      };
+
       const stop = () => {
         if (stopped) return;
         stopped = true;
@@ -519,6 +552,11 @@ class Maveo extends utils.Adapter {
     /** @param {Error} err */
     const onError = (err) => {
       this.log.warn(`LAN attempt ${label} failed: ${this.errorText(err)}`);
+      // If a push-button auth is in flight, fail it now so its 60 s timer
+      // does not linger and race with the next reconnect.
+      if (!this.probeActive) {
+        this.abortPendingPushButton("lan transport error: " + this.errorText(err));
+      }
       try { if (this.lanSocket) this.lanSocket.destroy(); } catch { /* ignore */ }
       try { if (this.ws) this.ws.close(); } catch { /* ignore */ }
     };
@@ -530,6 +568,10 @@ class Maveo extends utils.Adapter {
         return;
       }
       this.log.info(`LAN transport closed${hadError ? " (with error)" : ""}.`);
+      // Fail any pending push-button auth so the promise consumer notices
+      // the transport is gone. Without this the pending timer would keep the
+      // event loop busy and eventually settle against the *next* socket.
+      this.abortPendingPushButton("lan transport closed");
       this.rejectRpcRequests("lan closed");
       this.setStateAsync("info.connection", false, true).catch(() => {});
       this.scheduleReconnect();
@@ -716,6 +758,18 @@ class Maveo extends utils.Adapter {
     } else {
       pending.settle(() => pending.reject(new Error("Push-button auth failed: " + JSON.stringify(params))));
     }
+  }
+
+  /**
+   * Fail any currently-running push-button auth so a lost socket does not
+   * leave the promise hanging until its own 60 s timer fires (which would
+   * otherwise settle against a *newer* socket after reconnect).
+   * @param {string} reason
+   */
+  abortPendingPushButton(reason) {
+    const pending = this.pendingPushButton;
+    if (!pending || pending.settled) return;
+    pending.settle(() => pending.reject(new Error("Push-button auth aborted: " + reason)));
   }
 
   // ============================================================ Connection management
