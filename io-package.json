@@ -118,8 +118,9 @@
     "region": "eu",
     "wakeTopic": "",
     "boxIp": "",
-    "boxPort": 2222,
+    "boxPort": 0,
     "boxTls": true,
+    "boxWs": false,
     "localToken": ""
   },
   "objects": [],

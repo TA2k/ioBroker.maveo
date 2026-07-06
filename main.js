@@ -292,7 +292,16 @@ class Maveo extends utils.Adapter {
     }
     this.msgBuffer = "";
     this.log.debug("Connecting tunnel: " + REMOTE_PROXY_URL);
-    this.ws = new WebSocket(REMOTE_PROXY_URL, { perMessageDeflate: false });
+    // As of 2026-07 the marantec-managed CDN in front of remoteproxy.nymea.io
+    // serves a certificate for downloads.maveo-marantec.com, which trips
+    // ERR_TLS_CERT_ALTNAME_INVALID. The connection is still to the correct
+    // host, so we accept the mismatch — same trust boundary we already accept
+    // on the LAN box (rejectUnauthorized: false).
+    this.ws = new WebSocket(REMOTE_PROXY_URL, {
+      perMessageDeflate: false,
+      rejectUnauthorized: false,
+      checkServerIdentity: () => undefined,
+    });
 
     this.ws.on("open", () => {
       this.log.info("Tunnel connected.");
@@ -326,7 +335,7 @@ class Maveo extends utils.Adapter {
     this.ws.on("error", (err) => this.log.error("Tunnel error: " + this.errorText(err)));
   }
 
-  // ============================================================ LAN transport (TCP/TLS)
+  // ============================================================ LAN transport (TCP/TLS or WS)
 
   connectLan() {
     if (this.destroyed) return;
@@ -335,62 +344,137 @@ class Maveo extends utils.Adapter {
       try { this.lanSocket.removeAllListeners(); this.lanSocket.destroy(); } catch { /* ignore */ }
       this.lanSocket = null;
     }
+    if (this.ws && this.mode === "lan") {
+      try { this.ws.removeAllListeners(); this.ws.close(); } catch { /* ignore */ }
+      this.ws = null;
+    }
     this.msgBuffer = "";
 
+    // Build an ordered list of transports to try. Nymea:core exposes JSON-RPC
+    // over TCP (default 2222) and also over WebSocket (default 4444). If the
+    // user did not pin a port we probe both, TLS first then plain, so a box
+    // that closed the TCP port still works via WS.
     const host = (this.config.boxIp || "").trim();
-    const port = Number(this.config.boxPort) || 2222;
-    const useTls = this.config.boxTls !== false; // default true, nymea:core listens on SSL by default
+    const explicitPort = Number(this.config.boxPort) || 0;
+    const useTls = this.config.boxTls !== false;
+    const attempts = explicitPort
+      ? [{ kind: this.config.boxWs ? "ws" : "tcp", port: explicitPort, tls: useTls }]
+      : [
+        { kind: "tcp", port: 2222, tls: useTls },
+        { kind: "ws",  port: 4444, tls: useTls },
+        { kind: "tcp", port: 2222, tls: false },
+        { kind: "ws",  port: 4444, tls: false },
+      ];
 
-    this.log.debug(`LAN connect: host=${host} port=${port} tls=${useTls} tokenStored=${!!this.config.localToken}`);
+    this.log.debug(`LAN connect: host=${host} attempts=${JSON.stringify(attempts)} tokenStored=${!!this.config.localToken}`);
+    this.lanAttempts = attempts;
+    this.lanAttemptIdx = 0;
+    this.probeActive = true;
+    this.tryNextLanAttempt(host);
+  }
+
+  /** @param {string} host */
+  tryNextLanAttempt(host) {
+    if (this.destroyed) return;
+    const attempts = this.lanAttempts || [];
+    const idx = this.lanAttemptIdx || 0;
+    const attempt = attempts[idx];
+    if (!attempt) {
+      this.log.error([
+        `All LAN transport attempts to ${host} failed (${attempts.length} probed).`,
+        "The maveo box is reachable in the network but did not accept any nymea JSON-RPC",
+        "endpoint (TCP 2222 or WebSocket 4444, TLS or plain). Two common reasons:",
+        "  1) The box has been placed in cloud-only mode by the maveo app; local JSON-RPC",
+        "     is then disabled. Re-run the setup wizard in the app and enable the local",
+        "     API (nymea:core setting), or use Cloud mode instead.",
+        "  2) A different port is configured on the box; set 'boxPort' (and possibly enable",
+        "     'boxWs') in the adapter settings to match.",
+      ].join("\n"));
+      this.probeActive = false;
+      this.scheduleReconnect();
+      return;
+    }
+    this.lanAttemptIdx = idx + 1;
+    const label = `${attempt.kind}${attempt.tls ? "+tls" : ""}:${attempt.port}`;
+    this.log.info(`LAN try ${this.lanAttemptIdx}/${attempts.length}: ${label}`);
 
     const onConnect = () => {
-      this.log.info(`LAN socket connected to ${host}:${port} (${useTls ? "TLS" : "plain"}).`);
+      this.log.info(`LAN connected to ${host}:${attempt.port} via ${label}.`);
       this.reconnectDelay = 5000;
+      this.probeActive = false;
       this.startLanHandshake().catch((err) => {
         this.log.error("LAN handshake failed: " + this.errorText(err));
-        try { this.lanSocket && this.lanSocket.destroy(); } catch { /* ignore */ }
+        try {
+          if (this.lanSocket) this.lanSocket.destroy();
+          else if (this.ws) this.ws.close();
+        } catch { /* ignore */ }
       });
     };
+
+    /** @param {any} chunk */
     const onData = (chunk) => {
-      const text = chunk.toString("utf8");
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
       if (this.log.level === "debug" || this.log.level === "silly") {
-        // Keep the log line short so the transcript stays readable, but the
-        // full payload is available on the debug channel when investigating
-        // LAN handshake issues.
         this.log.debug(`LAN <-- ${text.length} bytes: ${text.slice(0, 400).replace(/\n/g, "\\n")}${text.length > 400 ? "…" : ""}`);
       }
       this.handleMessages(text);
     };
+
+    /** @param {Error} err */
+    const onError = (err) => {
+      this.log.warn(`LAN attempt ${label} failed: ${this.errorText(err)}`);
+      try { if (this.lanSocket) this.lanSocket.destroy(); } catch { /* ignore */ }
+      try { if (this.ws) this.ws.close(); } catch { /* ignore */ }
+    };
+
+    /** @param {any} hadError */
     const onClose = (hadError) => {
-      this.log.info(`LAN socket closed${hadError ? " (with error)" : ""}.`);
+      if (this.probeActive) {
+        this.tryNextLanAttempt(host);
+        return;
+      }
+      this.log.info(`LAN transport closed${hadError ? " (with error)" : ""}.`);
       this.rejectRpcRequests("lan closed");
       this.setStateAsync("info.connection", false, true).catch(() => {});
       this.scheduleReconnect();
     };
-    const onError = (err) => this.log.error("LAN socket error: " + this.errorText(err));
 
-    if (useTls) {
-      // The maveo box ships a self-signed certificate. Skip verification.
-      this.lanSocket = tls.connect({ host, port, rejectUnauthorized: false }, onConnect);
-      this.lanSocket.on("secureConnect", () => {
-        const sock = /** @type {tls.TLSSocket} */ (this.lanSocket);
-        try {
-          const cert = sock && sock.getPeerCertificate && sock.getPeerCertificate();
-          const cipher = sock && sock.getCipher && sock.getCipher();
-          const proto = sock && sock.getProtocol && sock.getProtocol();
-          this.log.debug(`LAN TLS ready: proto=${proto} cipher=${cipher && cipher.name} peer=${cert && cert.subject && cert.subject.CN}`);
-        } catch { /* ignore */ }
+    if (attempt.kind === "tcp") {
+      if (attempt.tls) {
+        this.lanSocket = tls.connect({ host, port: attempt.port, rejectUnauthorized: false }, onConnect);
+        this.lanSocket.on("secureConnect", () => {
+          const sock = /** @type {tls.TLSSocket} */ (this.lanSocket);
+          try {
+            const cert = sock && sock.getPeerCertificate && sock.getPeerCertificate();
+            const cipher = sock && sock.getCipher && sock.getCipher();
+            const proto = sock && sock.getProtocol && sock.getProtocol();
+            this.log.debug(`LAN TLS ready: proto=${proto} cipher=${cipher && cipher.name} peer=${cert && cert.subject && cert.subject.CN}`);
+          } catch { /* ignore */ }
+        });
+      } else {
+        this.lanSocket = net.createConnection({ host, port: attempt.port }, onConnect);
+      }
+      this.lanSocket.on("data", onData);
+      this.lanSocket.on("close", onClose);
+      this.lanSocket.on("error", onError);
+      this.lanSocket.setTimeout(30000, () => {
+        this.log.warn(`LAN socket idle for 30 s — closing and letting reconnect handle it.`);
+        try { this.lanSocket && this.lanSocket.destroy(new Error("LAN idle timeout")); } catch { /* ignore */ }
       });
     } else {
-      this.lanSocket = net.createConnection({ host, port }, onConnect);
+      // WebSocket transport (nymea's second JSON-RPC endpoint, default port 4444).
+      const url = `${attempt.tls ? "wss" : "ws"}://${host}:${attempt.port}`;
+      this.log.debug(`LAN WS URL: ${url}`);
+      this.ws = new WebSocket(url, {
+        perMessageDeflate: false,
+        rejectUnauthorized: false,
+        checkServerIdentity: () => undefined,
+      });
+      this.ws.on("open", onConnect);
+      this.ws.on("message", (data, isBinary) => onData(isBinary ? data : data.toString()));
+      this.ws.on("close", (code) => onClose(code !== 1000));
+      this.ws.on("error", onError);
     }
-    this.lanSocket.on("data", onData);
-    this.lanSocket.on("close", onClose);
-    this.lanSocket.on("error", onError);
-    this.lanSocket.setTimeout(30000, () => {
-      this.log.warn(`LAN socket idle for 30 s — closing and letting reconnect handle it.`);
-      try { this.lanSocket && this.lanSocket.destroy(new Error("LAN idle timeout")); } catch { /* ignore */ }
-    });
   }
 
   async startLanHandshake() {

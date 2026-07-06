@@ -147,10 +147,10 @@
     "boxPort": {
       "type": "number",
       "label": {
-        "en": "Port",
-        "de": "Port"
+        "en": "Port (0 = auto probe 2222/4444)",
+        "de": "Port (0 = automatisch 2222/4444 probieren)"
       },
-      "min": 1,
+      "min": 0,
       "max": 65535,
       "step": 1,
       "xs": 12,
@@ -165,11 +165,23 @@
         "en": "TLS",
         "de": "TLS"
       },
+      "xs": 6,
+      "sm": 3,
+      "md": 2,
+      "lg": 1,
+      "xl": 1
+    },
+    "boxWs": {
+      "type": "checkbox",
+      "label": {
+        "en": "WebSocket (only used with explicit port)",
+        "de": "WebSocket (nur bei explizitem Port)"
+      },
       "xs": 12,
-      "sm": 6,
-      "md": 3,
-      "lg": 2,
-      "xl": 2
+      "sm": 9,
+      "md": 7,
+      "lg": 5,
+      "xl": 5
     }
   }
 }
