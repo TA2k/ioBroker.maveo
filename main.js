@@ -32,6 +32,7 @@ const { v4: uuidv4 } = require("uuid");
 const aws4 = require("aws4");
 const AmazonCognitoIdentity = require("amazon-cognito-identity-js");
 const Json2iob = require("json2iob");
+const { Bonjour } = require("bonjour-service");
 
 const ENVIRONMENTS = {
   eu: {
@@ -339,6 +340,61 @@ class Maveo extends utils.Adapter {
 
   connectLan() {
     if (this.destroyed) return;
+    // Try mDNS first — if the box announces _jsonrpc._tcp / _ws._tcp we get
+    // the real port + sslEnabled flag without guessing. Falls through to the
+    // static probe list within 3 s if nothing answers.
+    this.discoverViaMdns()
+      .then((discovered) => this.startLanProbe(discovered))
+      .catch(() => this.startLanProbe([]));
+  }
+
+  discoverViaMdns() {
+    return new Promise((resolve) => {
+      const host = (this.config.boxIp || "").trim();
+      /** @type {{kind: string, port: number, tls: boolean}[]} */
+      const hits = [];
+      let bonjour;
+      try {
+        bonjour = new Bonjour();
+      } catch (err) {
+        this.log.debug("Bonjour init failed: " + this.errorText(err));
+        return resolve(hits);
+      }
+
+      const tryAddService = (service) => {
+        if (!service || !service.port) return;
+        const addrs = Array.isArray(service.addresses) ? service.addresses : [];
+        if (host && !addrs.includes(host)) return;
+        const sslEnabled = service.txt && (service.txt.sslEnabled === "true" || service.txt.sslenabled === "true");
+        hits.push({ kind: service.type === "ws" ? "ws" : "tcp", port: service.port, tls: !!sslEnabled });
+        this.log.info(`mDNS: ${service.type} on ${(addrs[0] || service.host)}:${service.port} tls=${!!sslEnabled}`);
+      };
+
+      let stopped = false;
+      const stop = () => {
+        if (stopped) return;
+        stopped = true;
+        try { bonjour.destroy(); } catch { /* ignore */ }
+        // Sort so TLS variants come first for stability.
+        hits.sort((a, b) => (b.tls ? 1 : 0) - (a.tls ? 1 : 0));
+        resolve(hits);
+      };
+
+      const timer = setTimeout(stop, 3000);
+      try {
+        bonjour.find({ type: "jsonrpc" }, tryAddService);
+        bonjour.find({ type: "ws" }, tryAddService);
+      } catch (err) {
+        clearTimeout(timer);
+        this.log.debug("Bonjour find failed: " + this.errorText(err));
+        stop();
+      }
+    });
+  }
+
+  /** @param {{kind: string, port: number, tls: boolean}[]} discovered */
+  startLanProbe(discovered) {
+    if (this.destroyed) return;
     this.rejectRpcRequests("lan reconnect");
     if (this.lanSocket) {
       try { this.lanSocket.removeAllListeners(); this.lanSocket.destroy(); } catch { /* ignore */ }
@@ -358,7 +414,7 @@ class Maveo extends utils.Adapter {
     const explicitPort = Number(this.config.boxPort) || 0;
     const useTls = this.config.boxTls !== false;
     const useWs = !!this.config.boxWs;
-    const attempts = explicitPort
+    const staticAttempts = explicitPort
       // With an explicit port we still probe both TLS variants of the chosen
       // transport (TCP or WS) so a port that speaks plain does not need a
       // second configuration round-trip.
@@ -377,6 +433,17 @@ class Maveo extends utils.Adapter {
         { kind: "ws",  port: 4445, tls: false },
       ];
 
+    // mDNS-discovered endpoints go first, then fall back to the static list.
+    // Deduplicate: static entries that match a discovered kind/port/tls are
+    // dropped so we do not probe the same endpoint twice.
+    /** @type {{kind: string, port: number, tls: boolean}[]} */
+    const mdnsAttempts = Array.isArray(discovered) ? discovered : [];
+    const seen = new Set(mdnsAttempts.map((a) => `${a.kind}:${a.port}:${a.tls}`));
+    const attempts = [
+      ...mdnsAttempts,
+      ...staticAttempts.filter((a) => !seen.has(`${a.kind}:${a.port}:${a.tls}`)),
+    ];
+
     this.log.debug(`LAN connect: host=${host} attempts=${JSON.stringify(attempts)} tokenStored=${!!this.config.localToken}`);
     this.lanAttempts = attempts;
     this.lanAttemptIdx = 0;
@@ -393,13 +460,25 @@ class Maveo extends utils.Adapter {
     if (!attempt) {
       this.log.error([
         `All LAN transport attempts to ${host} failed (${attempts.length} probed).`,
-        "The maveo box is reachable in the network but did not accept any nymea JSON-RPC",
-        "endpoint (TCP 2222 or WebSocket 4444, TLS or plain). Two common reasons:",
-        "  1) The box has been placed in cloud-only mode by the maveo app; local JSON-RPC",
-        "     is then disabled. Re-run the setup wizard in the app and enable the local",
-        "     API (nymea:core setting), or use Cloud mode instead.",
-        "  2) A different port is configured on the box; set 'boxPort' (and possibly enable",
-        "     'boxWs') in the adapter settings to match.",
+        "",
+        "The maveo box is a nymea:core instance, but it did not answer on any of the",
+        "standard nymea JSON-RPC endpoints (TCP 2222 plain / 2223 TLS or WebSocket",
+        "4445 plain / 4444 TLS). This adapter also does not see an mDNS advert of",
+        "'_jsonrpc._tcp' or '_ws._tcp' from the box.",
+        "",
+        "Most likely cause: the local nymea API is disabled on the box. To enable it:",
+        "  * Open the maveo app.",
+        "  * Go to the box settings ('Box' or 'nymea:core' section).",
+        "  * Enable 'Multicast DNS / DNS-SD service discovery' (aka 'Local API' /",
+        "    'Third-party connection').",
+        "  * Save and wait until the box is back online.",
+        "",
+        "Note: the TCP 2785 / UDP 2784 ports shown in the app are the marantec-only",
+        "'MaveoBoxCommander' (Loxone/Gira integration) and are NOT nymea JSON-RPC — do",
+        "not put them into 'boxPort' here.",
+        "",
+        "If the ports are non-standard (uncommon), pin them via 'boxPort' (and set",
+        "'boxWs' when the port speaks WebSocket) in the adapter settings.",
       ].join("\n"));
       this.probeActive = false;
       this.scheduleReconnect();

@@ -30,6 +30,7 @@
     "amazon-cognito-identity-js": "^6.3.20",
     "aws4": "^1.13.2",
     "axios": "^1.18.1",
+    "bonjour-service": "^1.4.2",
     "json2iob": "^2.6.25",
     "uuid": "^14.0.1",
     "ws": "^8.21.0"
