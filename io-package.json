@@ -73,8 +73,13 @@
       "uk": "Адаптер для додатка гаражних воріт maveo",
       "zh-cn": "用于 maveo 车库门应用程序的适配器"
     },
-    "authors": ["TA2k <tombox2020@gmail.com>"],
-    "keywords": ["maveo", "marantec"],
+    "authors": [
+      "TA2k <tombox2020@gmail.com>"
+    ],
+    "keywords": [
+      "maveo",
+      "marantec"
+    ],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -106,12 +111,18 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.6.20"
+        "admin": ">=7.8.23"
       }
     ]
   },
-  "encryptedNative": ["password", "localToken"],
-  "protectedNative": ["password", "localToken"],
+  "encryptedNative": [
+    "password",
+    "localToken"
+  ],
+  "protectedNative": [
+    "password",
+    "localToken"
+  ],
   "native": {
     "username": "",
     "password": "",
