@@ -60,6 +60,10 @@ https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
 
+
+### **WORK IN PROGRESS**
+- (ioBroker-Bot) Adapter requires admin >= 7.8.23 now.
+
 ### 0.1.0
 
 * Two operating modes: cloud (Cognito + Nymea tunnel) and LAN (direct
