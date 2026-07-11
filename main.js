@@ -26,8 +26,8 @@
 const utils = require("@iobroker/adapter-core");
 const axios = require("axios").default;
 const WebSocket = require("ws");
-const net = require("net");
-const tls = require("tls");
+const net = require("node:net");
+const tls = require("node:tls");
 const { v4: uuidv4 } = require("uuid");
 const aws4 = require("aws4");
 const AmazonCognitoIdentity = require("amazon-cognito-identity-js");
