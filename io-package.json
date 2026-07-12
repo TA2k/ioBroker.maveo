@@ -121,6 +121,7 @@
     "boxPort": 0,
     "boxTls": true,
     "boxWs": false,
+    "pushButtonWindow": 300,
     "localToken": ""
   },
   "objects": [],

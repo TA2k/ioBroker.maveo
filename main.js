@@ -715,9 +715,16 @@ class Maveo extends utils.Adapter {
         fn();
       };
 
+      // Push-button auth window. The box's own RequestPushButtonAuth stays
+      // valid until it completes or the transport drops, so we give the user
+      // a generous, configurable window (default 300 s) to walk to the box
+      // that typically sits at the gate. Configurable via pushButtonWindow
+      // (seconds) in the adapter settings.
+      const windowSec = Math.max(30, Number(this.config.pushButtonWindow) || 300);
+      this.log.info(`Push-button window: ${windowSec} s. Press the yellow button on the maveo box.`);
       this.pushButtonTimeout = setTimeout(() => {
-        settle(() => reject(new Error("Push-button auth timed out — no button press within 60 s.")));
-      }, 60000);
+        settle(() => reject(new Error(`Push-button auth timed out — no button press within ${windowSec} s.`)));
+      }, windowSec * 1000);
 
       this.sendAndAwait({
         method: "JSONRPC.RequestPushButtonAuth",
@@ -729,7 +736,7 @@ class Maveo extends utils.Adapter {
           return;
         }
         pending.transactionId = txId;
-        this.log.info(`Push-button auth started (txId=${txId}). WAITING FOR BUTTON PRESS on the maveo box.`);
+        this.log.info(`Push-button auth started (txId=${txId}). WAITING FOR BUTTON PRESS on the maveo box (${windowSec} s).`);
         // Drain any notifications that arrived before we knew the txId.
         /** @type {any[]} */
         const early = pending.earlyNotifications.splice(0);
