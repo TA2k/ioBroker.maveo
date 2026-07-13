@@ -696,10 +696,11 @@ class Maveo extends utils.Adapter {
     // route the notification through dispatchMessage rather than a raw-line
     // sniffer.
     return new Promise((resolve, reject) => {
-      /** @type {{ transactionId: number, earlyNotifications: any[], settled: boolean, resolve: (t: string) => void, reject: (e: Error) => void, settle: (fn: () => void) => void }} */
+      /** @type {{ replyReceived: boolean, expectedTxId: number|null, earlyNotifications: any[], settled: boolean, resolve: (t: string) => void, reject: (e: Error) => void, settle: (fn: () => void) => void }} */
       const pending = /** @type {any} */ ({
-        transactionId: -1,             // filled in when the reply arrives
-        earlyNotifications: [],        // params received before we know the txId
+        replyReceived: false,          // RequestPushButtonAuth reply seen yet?
+        expectedTxId: null,            // transactionId from the reply (null = unknown)
+        earlyNotifications: [],        // params received before the reply
         settled: false,
       });
       this.pendingPushButton = pending;
@@ -730,14 +731,17 @@ class Maveo extends utils.Adapter {
         method: "JSONRPC.RequestPushButtonAuth",
         params: { deviceName: "iobroker-maveo" },
       }, true).then((reply) => {
-        const txId = reply && reply.params && reply.params.transactionId;
-        if (typeof txId !== "number") {
-          settle(() => reject(new Error("RequestPushButtonAuth: no transactionId in reply: " + JSON.stringify(reply))));
-          return;
-        }
-        pending.transactionId = txId;
-        this.log.info(`Push-button auth started (txId=${txId}). WAITING FOR BUTTON PRESS on the maveo box (${windowSec} s).`);
-        // Drain any notifications that arrived before we knew the txId.
+        this.log.debug("RequestPushButtonAuth reply: " + JSON.stringify(reply));
+        // transactionId is normally in params; tolerate a top-level id or a
+        // missing value (some firmware just returns success). null means we
+        // do not know it and will accept the first PushButtonAuthFinished.
+        const txId = (reply && reply.params && typeof reply.params.transactionId === "number")
+          ? reply.params.transactionId
+          : (reply && typeof reply.transactionId === "number" ? reply.transactionId : null);
+        pending.replyReceived = true;
+        pending.expectedTxId = txId;
+        this.log.info(`Push-button auth started (txId=${txId === null ? "n/a" : txId}). WAITING FOR BUTTON PRESS on the maveo box (${windowSec} s).`);
+        // Drain any notifications that arrived before the reply.
         /** @type {any[]} */
         const early = pending.earlyNotifications.splice(0);
         if (early.length) this.log.debug(`Draining ${early.length} early push-button notification(s).`);
@@ -754,16 +758,26 @@ class Maveo extends utils.Adapter {
   deliverPushButton(params) {
     const pending = this.pendingPushButton;
     if (!pending || pending.settled) return;
-    if (pending.transactionId < 0) {
-      // Reply hasn't arrived yet — buffer for later matching.
+    if (!pending.replyReceived) {
+      // RequestPushButtonAuth reply not seen yet — buffer for later matching.
       pending.earlyNotifications.push(params);
       return;
     }
-    if (params.transactionId !== pending.transactionId) return;
+    // The nymea reference client (HA maveo_box.py) accepts the first
+    // PushButtonAuthFinished notification without checking transactionId.
+    // If the reply carried a numeric transactionId AND the notification
+    // carries a different numeric one, that mismatch is real — reject it.
+    // If either side is unknown (null), accept: there is only ever one auth
+    // in flight and this matches the reference behaviour.
+    const notifTx = typeof params.transactionId === "number" ? params.transactionId : null;
+    if (pending.expectedTxId !== null && notifTx !== null && notifTx !== pending.expectedTxId) {
+      this.log.debug(`Ignoring push-button notification for txId ${notifTx} (expected ${pending.expectedTxId}).`);
+      return;
+    }
     if (params.success && params.token) {
       pending.settle(() => pending.resolve(params.token));
     } else {
-      pending.settle(() => pending.reject(new Error("Push-button auth failed: " + JSON.stringify(params))));
+      pending.settle(() => pending.reject(new Error("Push-button auth failed: " + JSON.stringify({ ...params, token: params.token ? "<hidden>" : undefined }))));
     }
   }
 
@@ -850,6 +864,41 @@ class Maveo extends utils.Adapter {
   }
 
   async dispatchMessage(msg) {
+    // Notifications are dispatched FIRST. A message carrying `notification`
+    // is never an RPC reply, and some nymea firmware attaches an `id` to
+    // notifications too — without this guard such a notification could be
+    // mistaken for the reply of an open request with the same id and the
+    // real handler (e.g. PushButtonAuthFinished) would never run.
+    if (msg.notification) {
+      // While a push-button auth is in flight, surface every notification at
+      // info level so it is visible whether the box reacts to the button at
+      // all. The token in a PushButtonAuthFinished payload is redacted.
+      if (this.pendingPushButton && !this.pendingPushButton.settled) {
+        const safe = { ...(msg.params || {}) };
+        if (safe.token) safe.token = "<hidden>";
+        this.log.info(`During push-button wait, received notification: ${msg.notification} ${JSON.stringify(safe).slice(0, 200)}`);
+      } else {
+        this.log.debug(`<-- notification: ${msg.notification}`);
+      }
+
+      if (msg.notification === "RemoteProxy.TunnelEstablished") {
+        this.log.info("Nymea tunnel established.");
+        await this.initTopology();
+        await this.setStateAsync("info.connection", true, true);
+        return;
+      }
+      if (msg.notification === "JSONRPC.PushButtonAuthFinished" && msg.params) {
+        this.log.info(`Push-button notification received: success=${msg.params.success} txId=${msg.params.transactionId}`);
+        this.deliverPushButton(msg.params);
+        return;
+      }
+      if (msg.notification === "Integrations.StateChanged" && msg.params) {
+        await this.applyStateChange(msg.params);
+        return;
+      }
+      return;
+    }
+
     if (msg.id != null && this.rpcRequests[msg.id]) {
       const req = this.rpcRequests[msg.id];
       delete this.rpcRequests[msg.id];
@@ -866,30 +915,6 @@ class Maveo extends utils.Adapter {
 
     if (msg.status === "error") {
       this.log.error("Reply error: " + JSON.stringify(msg));
-      return;
-    }
-
-    if (msg.notification) {
-      this.log.debug(`<-- notification: ${msg.notification}`);
-    }
-
-    // Cloud only: after Authenticate the proxy notifies us to start
-    // talking to nymea:core.
-    if (msg.notification === "RemoteProxy.TunnelEstablished") {
-      this.log.info("Nymea tunnel established.");
-      await this.initTopology();
-      await this.setStateAsync("info.connection", true, true);
-      return;
-    }
-
-    if (msg.notification === "JSONRPC.PushButtonAuthFinished" && msg.params) {
-      this.log.info(`Push-button notification received: success=${msg.params.success} txId=${msg.params.transactionId}`);
-      this.deliverPushButton(msg.params);
-      return;
-    }
-
-    if (msg.notification === "Integrations.StateChanged" && msg.params) {
-      await this.applyStateChange(msg.params);
       return;
     }
   }
