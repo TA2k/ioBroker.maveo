@@ -666,6 +666,14 @@ class Maveo extends utils.Adapter {
         this.log.debug("Reusing stored localToken (length=" + token.length + ").");
       }
       this.rpcToken = token;
+
+      // nymea binds the authenticated user to the handshake: once we start
+      // sending a token, the very first JSONRPC.Hello of the session must
+      // already carry it, otherwise the box replies "Changing the user
+      // (token) requires a new handshake." So we redo Hello now, this time
+      // with the token, before any authenticated call.
+      this.log.debug("LAN handshake: re-sending JSONRPC.Hello with token");
+      await this.sendAndAwait({ method: "JSONRPC.Hello", params: { locale: "de_DE" } });
     } else {
       this.log.info("Box does not require authentication.");
       this.rpcToken = null;
