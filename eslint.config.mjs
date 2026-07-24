@@ -3,7 +3,7 @@ import globals from "globals";
 
 export default [
   {
-    ignores: [".eslintrc.js", "node_modules/**", "admin/words.js"],
+    ignores: [".eslintrc.js", "node_modules/**"],
   },
   js.configs.recommended,
   {

@@ -26,8 +26,8 @@
 const utils = require("@iobroker/adapter-core");
 const axios = require("axios").default;
 const WebSocket = require("ws");
-const net = require("net");
-const tls = require("tls");
+const net = require("node:net");
+const tls = require("node:tls");
 const { v4: uuidv4 } = require("uuid");
 const aws4 = require("aws4");
 const AmazonCognitoIdentity = require("amazon-cognito-identity-js");
@@ -134,7 +134,7 @@ class Maveo extends utils.Adapter {
       return;
     }
 
-    this.refreshTokenTimer = setInterval(() => {
+    this.refreshTokenTimer = this.setInterval(() => {
       this.refreshCognitoSession().catch((err) =>
         this.log.error("Refresh failed: " + this.errorText(err))
       );
@@ -414,12 +414,12 @@ class Maveo extends utils.Adapter {
         resolve(hits);
       };
 
-      const timer = setTimeout(stop, 3000);
+      const timer = this.setTimeout(stop, 3000);
       try {
         bonjour.find({ type: "jsonrpc" }, tryAddService);
         bonjour.find({ type: "ws" }, tryAddService);
       } catch (err) {
-        clearTimeout(timer);
+        this.clearTimeout(timer);
         this.log.debug("Bonjour find failed: " + this.errorText(err));
         stop();
       }
@@ -718,7 +718,7 @@ class Maveo extends utils.Adapter {
         if (pending.settled) return;
         pending.settled = true;
         if (this.pushButtonTimeout) {
-          clearTimeout(this.pushButtonTimeout);
+          this.clearTimeout(this.pushButtonTimeout);
           this.pushButtonTimeout = null;
         }
         this.pendingPushButton = null;
@@ -732,7 +732,7 @@ class Maveo extends utils.Adapter {
       // (seconds) in the adapter settings.
       const windowSec = Math.max(30, Number(this.config.pushButtonWindow) || 300);
       this.log.info(`Push-button window: ${windowSec} s. Press the yellow button on the maveo box.`);
-      this.pushButtonTimeout = setTimeout(() => {
+      this.pushButtonTimeout = this.setTimeout(() => {
         settle(() => reject(new Error(`Push-button auth timed out — no button press within ${windowSec} s.`)));
       }, windowSec * 1000);
 
@@ -808,7 +808,7 @@ class Maveo extends utils.Adapter {
     if (this.destroyed) return;
     if (this.reconnectTimer) return;
     const delay = Math.min(this.reconnectDelay, 5 * 60 * 1000);
-    this.reconnectTimer = setTimeout(async () => {
+    this.reconnectTimer = this.setTimeout(async () => {
       this.reconnectTimer = null;
       this.reconnectDelay = Math.min(delay * 2, 5 * 60 * 1000);
       if (this.mode === "lan") {
@@ -832,8 +832,8 @@ class Maveo extends utils.Adapter {
 
   armIdleTimer() {
     if (this.mode !== "cloud") return;
-    if (this.wsIdleTimer) clearTimeout(this.wsIdleTimer);
-    this.wsIdleTimer = setTimeout(() => {
+    if (this.wsIdleTimer) this.clearTimeout(this.wsIdleTimer);
+    this.wsIdleTimer = this.setTimeout(() => {
       this.log.info("Tunnel idle for 11 min — reconnecting.");
       try { this.ws && this.ws.close(); } catch { /* ignore */ }
     }, 11 * 60 * 1000);
@@ -911,7 +911,7 @@ class Maveo extends utils.Adapter {
     if (msg.id != null && this.rpcRequests[msg.id]) {
       const req = this.rpcRequests[msg.id];
       delete this.rpcRequests[msg.id];
-      clearTimeout(req.timeout);
+      this.clearTimeout(req.timeout);
       if (msg.status === "error") {
         this.log.debug(`<-- id=${msg.id} ERROR: ${JSON.stringify(msg.error || msg.params || msg).slice(0, 400)}`);
         req.reject(new Error("Nymea error reply for id " + msg.id + ": " + JSON.stringify(msg.error || msg.params || msg)));
@@ -971,7 +971,7 @@ class Maveo extends utils.Adapter {
 
   rejectRpcRequests(reason) {
     for (const [id, req] of Object.entries(this.rpcRequests)) {
-      clearTimeout(req.timeout);
+      this.clearTimeout(req.timeout);
       req.reject(new Error(reason));
       delete this.rpcRequests[id];
     }
@@ -1004,7 +1004,7 @@ class Maveo extends utils.Adapter {
   sendAndAwait(payload, isHandshake) {
     return new Promise((resolve, reject) => {
       const id = this.rpcRequestId++;
-      const timeout = setTimeout(() => {
+      const timeout = this.setTimeout(() => {
         if (this.rpcRequests[id]) {
           delete this.rpcRequests[id];
           this.log.warn(`Nymea call timed out: ${payload.method} (id=${id})`);
@@ -1265,10 +1265,10 @@ class Maveo extends utils.Adapter {
     try {
       this.destroyed = true;
       this.setState("info.connection", false, true);
-      if (this.refreshTokenTimer) clearInterval(this.refreshTokenTimer);
-      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-      if (this.wsIdleTimer) clearTimeout(this.wsIdleTimer);
-      if (this.pushButtonTimeout) clearTimeout(this.pushButtonTimeout);
+      if (this.refreshTokenTimer) this.clearInterval(this.refreshTokenTimer);
+      if (this.reconnectTimer) this.clearTimeout(this.reconnectTimer);
+      if (this.wsIdleTimer) this.clearTimeout(this.wsIdleTimer);
+      if (this.pushButtonTimeout) this.clearTimeout(this.pushButtonTimeout);
       // Fail any pending push-button auth so its promise consumer sees the shutdown.
       const pending = this.pendingPushButton;
       if (pending && !pending.settled) {

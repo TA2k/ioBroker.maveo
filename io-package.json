@@ -5,7 +5,16 @@
     "news": {
       "0.1.0": {
         "en": "rewritten against the Marantec cloud backend (region select, real Cognito pool/client IDs, thing/action discovery over the nymea tunnel, working remote controls)",
-        "de": "Adapter komplett gegen die Marantec-Cloud umgeschrieben (Region auswählbar, echte Cognito-Pool/Client-IDs, Thing/Action-Discovery über Nymea-Tunnel, funktionierende Remote-Steuerung)"
+        "de": "Adapter komplett gegen die Marantec-Cloud umgeschrieben (Region auswählbar, echte Cognito-Pool/Client-IDs, Thing/Action-Discovery über Nymea-Tunnel, funktionierende Remote-Steuerung)",
+        "ru": "переписан под облако Marantec (выбор региона, реальные ID пула/клиента Cognito, обнаружение устройств через туннель nymea, рабочее управление)",
+        "pt": "reescrito para o backend da nuvem Marantec (seleção de região, IDs reais de pool/cliente Cognito, descoberta de dispositivos pelo túnel nymea, controlo remoto funcional)",
+        "nl": "herschreven voor de Marantec-cloud (regiokeuze, echte Cognito pool/client-ID's, apparaatdetectie via nymea-tunnel, werkende afstandsbediening)",
+        "fr": "réécrit pour le cloud Marantec (choix de région, vrais ID de pool/client Cognito, découverte via tunnel nymea, commandes fonctionnelles)",
+        "it": "riscritto per il cloud Marantec (selezione regione, veri ID pool/client Cognito, rilevamento tramite tunnel nymea, controlli funzionanti)",
+        "es": "reescrito para la nube de Marantec (selección de región, IDs reales de pool/cliente Cognito, detección por túnel nymea, controles funcionales)",
+        "pl": "przepisany pod chmurę Marantec (wybór regionu, prawdziwe ID puli/klienta Cognito, wykrywanie przez tunel nymea, działające sterowanie)",
+        "uk": "переписано під хмару Marantec (вибір регіону, справжні ID пулу/клієнта Cognito, виявлення через тунель nymea, робоче керування)",
+        "zh-cn": "针对 Marantec 云端重写（区域选择、真实 Cognito 池/客户端 ID、通过 nymea 隧道发现设备、可用的远程控制）"
       },
       "0.0.5": {
         "en": "update login keys",

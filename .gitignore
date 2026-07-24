@@ -22,3 +22,6 @@ admin/i18n/*/flat.txt
 # local debug log dumps
 Maveo.rtf
 *.rtf
+
+# reverse-engineering references / debug helpers (never published)
+.references/

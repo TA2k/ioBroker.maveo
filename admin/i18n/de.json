@@ -1,0 +1,20 @@
+{
+  "Maveo": "Maveo",
+  "Two modes: Cloud (Cognito login + nymea proxy) is used by default. Set 'boxIp' to switch to LAN mode (direct JSON-RPC to the box, push-button auth on first start).": "Zwei Modi: Cloud (Cognito-Login + Nymea-Proxy) ist Standard. 'boxIp' setzen, um in den LAN-Modus zu wechseln (direkte JSON-RPC-Verbindung zur Box, Push-Button-Auth beim ersten Start).",
+  "Cloud mode": "Cloud-Modus",
+  "App Email": "App-E-Mail",
+  "App Password": "App-Passwort",
+  "Region": "Region",
+  "Europe (eu-central-1)": "Europa (eu-central-1)",
+  "United States (us-west-2)": "USA (us-west-2)",
+  "IoT wake topic (optional)": "IoT-Wake-Topic (optional)",
+  "AWS IoT topic used to wake the box before connecting to the proxy. Leave empty to skip.": "AWS-IoT-Topic zum Aufwecken der Box vor dem Verbindungsaufbau. Leer lassen, um zu überspringen.",
+  "LAN mode (direct connection to the box)": "LAN-Modus (direkte Verbindung zur Box)",
+  "As soon as 'Maveo box IP' is set, LAN mode is active and cloud settings above are ignored. On first start you have up to 5 minutes to press the yellow button on the maveo box; the token is stored encrypted and reused on subsequent starts.": "Sobald 'Maveo-Box-IP' gesetzt ist, ist der LAN-Modus aktiv und die Cloud-Einstellungen oben werden ignoriert. Beim ersten Start hast du bis zu 5 Minuten Zeit, die gelbe Taste an der maveo-Box zu drücken; der Token wird verschlüsselt gespeichert und bei weiteren Starts wiederverwendet.",
+  "Maveo box IP": "Maveo-Box-IP",
+  "Port (0 = auto probe 2222/4444)": "Port (0 = automatisch 2222/4444 probieren)",
+  "TLS": "TLS",
+  "WebSocket (only used with explicit port)": "WebSocket (nur bei explizitem Port)",
+  "Push-button window (seconds)": "Push-Button-Zeitfenster (Sekunden)",
+  "Time to walk to the box and press the yellow button on first LAN setup. Default 300 s.": "Zeit, um zur Box zu gehen und beim ersten LAN-Setup die gelbe Taste zu drücken. Standard 300 s."
+}
