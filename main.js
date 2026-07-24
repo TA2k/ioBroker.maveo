@@ -1062,6 +1062,7 @@ class Maveo extends utils.Adapter {
     });
     await this.setObjectNotExistsAsync(id + ".general", { type: "channel", common: { name: "General Information" }, native: {} });
     await this.setObjectNotExistsAsync(id + ".remote", { type: "channel", common: { name: "Remote Controls" }, native: {} });
+    await this.setObjectNotExistsAsync(id + ".status", { type: "channel", common: { name: "Status" }, native: {} });
     await this.json2iob.parse(id + ".general", {
       name: thing.name,
       thingClassId: thing.thingClassId,
@@ -1112,6 +1113,7 @@ class Maveo extends utils.Adapter {
     const name = stateType.displayName || stateType.name || stateType.id;
     this.log.debug(`StateChanged ${thingId}.${name} = ${JSON.stringify(params.value)}`);
     await this.setObjectNotExistsAsync(thingId, { type: "device", common: { name: thingId }, native: {} });
+    await this.setObjectNotExistsAsync(thingId + ".status", { type: "channel", common: { name: "Status" }, native: {} });
     const path = await this.upsertStateObject(thingId, stateType);
     await this.setStateAsync(path, {
       val: this.coerceStateValue(stateType, params.value),
@@ -1142,7 +1144,7 @@ class Maveo extends utils.Adapter {
       while (taken.has(slug)) { slug = `${base}_${n++}`; }
       slugMap[stateType.id] = slug;
     }
-    const objId = `${thingId}.${slug}`;
+    const objId = `${thingId}.status.${slug}`;
     const unit = stateType.unit && stateType.unit !== "UnitNone"
       ? stateType.unit.replace("Unit", "")
       : undefined;
