@@ -18,3 +18,7 @@ admin/i18n/*/flat.txt
 
 .commitinfo
 .DS_Store
+
+# local debug log dumps
+Maveo.rtf
+*.rtf

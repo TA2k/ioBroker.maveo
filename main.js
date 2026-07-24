@@ -60,10 +60,10 @@ const ENVIRONMENTS = {
 };
 
 const REMOTE_PROXY_URL = "wss://remoteproxy.nymea.io";
-const NAMESPACES = [
-  "System", "JSONRPC", "Integrations", "Rules",
-  "Logging", "Configuration", "Tags", "Scripts",
-];
+// The only notifications this adapter acts on are Integrations.StateChanged
+// (thing state updates). Subscribing to just this namespace stops the box
+// from flooding us with NetworkManager.* / Logging.* traffic we discard.
+const NAMESPACES = ["Integrations"];
 
 class Maveo extends utils.Adapter {
   constructor(options) {
@@ -80,6 +80,7 @@ class Maveo extends utils.Adapter {
     this.thingClasses = {};
     this.stateTypes = {};
     this.actionTypesByThing = {};
+    this.stateSlugByThing = {};   // thingId → { stateTypeId → readable slug }
 
     // json-rpc request tracking
     this.rpcRequestId = 100;
@@ -679,13 +680,13 @@ class Maveo extends utils.Adapter {
       this.rpcToken = null;
     }
 
-    this.log.debug("LAN handshake: enabling notifications");
+    this.log.debug("LAN handshake: enabling notifications (namespace filter: " + NAMESPACES.join(",") + ")");
     await this.sendAndAwait({
       method: "JSONRPC.SetNotificationStatus",
-      // The nymea reference implementation (HA custom_component maveo_box.py)
-      // sends just { enabled: true }. Some nymea versions accept a namespaces
-      // filter, but the boolean form is the compatible baseline.
-      params: { enabled: true },
+      // enabled:true is the proven baseline (HA maveo_box.py). Adding a
+      // namespaces filter restricts pushes to Integrations.* only; a box that
+      // ignores the field falls back to the working all-namespaces behaviour.
+      params: { enabled: true, namespaces: NAMESPACES },
     });
 
     this.log.debug("LAN handshake: initTopology");
@@ -1072,13 +1073,13 @@ class Maveo extends utils.Adapter {
     const actionTypes = tc ? tc.actionTypes || {} : {};
     const mapForThing = {};
     for (const at of Object.values(actionTypes)) {
-      const command = (at.name || at.displayName || at.id).replace(/[^A-Za-z0-9_-]/g, "_");
+      const command = this.slugify(at.name || at.displayName || at.id);
       mapForThing[command] = at.id;
       await this.setObjectNotExistsAsync(id + ".remote." + command, {
         type: "state",
         common: {
           name: at.displayName || command,
-          role: "button",
+          role: this.roleForAction(at),
           type: "boolean",
           read: true,
           write: true,
@@ -1093,8 +1094,8 @@ class Maveo extends utils.Adapter {
     for (const s of Object.values(thing.states || {})) {
       const stateType = stateTypes[s.stateTypeId] || this.stateTypes[s.stateTypeId];
       if (!stateType) continue;
-      await this.upsertStateObject(id, stateType);
-      await this.setStateAsync(id + "." + stateType.id, {
+      const path = await this.upsertStateObject(id, stateType);
+      await this.setStateAsync(path, {
         val: this.coerceStateValue(stateType, s.value),
         ack: true,
       });
@@ -1111,29 +1112,97 @@ class Maveo extends utils.Adapter {
     const name = stateType.displayName || stateType.name || stateType.id;
     this.log.debug(`StateChanged ${thingId}.${name} = ${JSON.stringify(params.value)}`);
     await this.setObjectNotExistsAsync(thingId, { type: "device", common: { name: thingId }, native: {} });
-    await this.upsertStateObject(thingId, stateType);
-    await this.setStateAsync(thingId + "." + stateType.id, {
+    const path = await this.upsertStateObject(thingId, stateType);
+    await this.setStateAsync(path, {
       val: this.coerceStateValue(stateType, params.value),
       ack: true,
     });
   }
 
+  /**
+   * Create/ensure the ioBroker state object for a nymea stateType and return
+   * its full object path. Uses a human-readable slug of the state's name as
+   * the object id, but keeps a stable mapping so both the initial seed and
+   * later StateChanged notifications resolve to the same object.
+   * @param {string} thingId
+   * @param {any} stateType
+   * @returns {Promise<string>}
+   */
   async upsertStateObject(thingId, stateType) {
+    if (!this.stateSlugByThing) this.stateSlugByThing = {};
+    if (!this.stateSlugByThing[thingId]) this.stateSlugByThing[thingId] = {};
+    const slugMap = this.stateSlugByThing[thingId];
+    let slug = slugMap[stateType.id];
+    if (!slug) {
+      const base = this.slugify(stateType.name || stateType.displayName || stateType.id);
+      // Guard against two state types slugifying to the same id within one thing.
+      slug = base;
+      let n = 2;
+      const taken = new Set(Object.values(slugMap));
+      while (taken.has(slug)) { slug = `${base}_${n++}`; }
+      slugMap[stateType.id] = slug;
+    }
+    const objId = `${thingId}.${slug}`;
     const unit = stateType.unit && stateType.unit !== "UnitNone"
       ? stateType.unit.replace("Unit", "")
       : undefined;
-    await this.setObjectNotExistsAsync(thingId + "." + stateType.id, {
+    await this.setObjectNotExistsAsync(objId, {
       type: "state",
       common: {
         name: stateType.displayName || stateType.name || stateType.id,
         type: this.mapType(stateType.type),
-        role: stateType.unit === "UnitUnixTime" ? "date" : "value",
+        role: this.roleForState(stateType),
         read: true,
         write: false,
         unit,
       },
       native: { stateTypeId: stateType.id },
     });
+    return objId;
+  }
+
+  /**
+   * Map a nymea state name to a sensible ioBroker role.
+   * @param {any} stateType
+   */
+  roleForState(stateType) {
+    const n = (stateType.name || stateType.displayName || "").toLowerCase();
+    if (stateType.unit === "UnitUnixTime") return "date";
+    if (/battery/.test(n)) return "value.battery";
+    if (stateType.unit === "UnitPercentage") return "level";
+    if (/temperature/.test(n)) return "value.temperature";
+    if (/humidity/.test(n)) return "value.humidity";
+    if (/light(?!barrier)/.test(n) && this.mapType(stateType.type) === "boolean") return "switch.light";
+    if (/(barrier|lichtschranke|motion|movement)/.test(n)) return "sensor.motion";
+    if (/(state|position|door)/.test(n)) return "value.door";
+    if (this.mapType(stateType.type) === "boolean") return "indicator";
+    if (this.mapType(stateType.type) === "number") return "value";
+    return "text";
+  }
+
+  /**
+   * Map a nymea action name to a sensible ioBroker button role.
+   * @param {any} actionType
+   */
+  roleForAction(actionType) {
+    const n = (actionType.name || actionType.displayName || "").toLowerCase();
+    if (/open/.test(n)) return "button.open";
+    if (/close/.test(n)) return "button.close";
+    if (/stop/.test(n)) return "button.stop";
+    return "button";
+  }
+
+  /**
+   * Slugify a display/name string into a safe, readable object id segment.
+   * @param {string} s
+   */
+  slugify(s) {
+    return String(s)
+      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+      .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue")
+      .replace(/[^A-Za-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      || "unknown";
   }
 
   coerceStateValue(stateType, value) {
