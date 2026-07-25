@@ -1091,15 +1091,21 @@ class Maveo extends utils.Adapter {
     }
     this.actionTypesByThing[id] = mapForThing;
 
+    // Create an object for EVERY state type the thing class declares, not
+    // just the ones that already carry a value in GetThings. Otherwise
+    // states that have not changed yet (e.g. ventilation position) would be
+    // missing from the status channel until their first StateChanged.
     const stateTypes = tc ? tc.stateTypes || {} : {};
-    for (const s of Object.values(thing.states || {})) {
-      const stateType = stateTypes[s.stateTypeId] || this.stateTypes[s.stateTypeId];
-      if (!stateType) continue;
+    const currentValues = {};
+    for (const s of Object.values(thing.states || {})) currentValues[s.stateTypeId] = s.value;
+    for (const stateType of Object.values(stateTypes)) {
       const path = await this.upsertStateObject(id, stateType);
-      await this.setStateAsync(path, {
-        val: this.coerceStateValue(stateType, s.value),
-        ack: true,
-      });
+      if (Object.prototype.hasOwnProperty.call(currentValues, stateType.id)) {
+        await this.setStateAsync(path, {
+          val: this.coerceStateValue(stateType, currentValues[stateType.id]),
+          ack: true,
+        });
+      }
     }
   }
 
