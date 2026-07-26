@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "maveo",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "news": {
+      "0.1.1": {
+        "en": "Local (LAN) control of the maveo box added — no cloud needed: enter the box IP, press the yellow button once, done. Cloud login still available. Garage door, light and sensors as ready-to-use states.",
+        "de": "Lokale Steuerung (LAN) der maveo-Box ergänzt — ohne Cloud: Box-IP eintragen, einmal die gelbe Taste drücken, fertig. Cloud-Login weiterhin möglich. Garagentor, Licht und Sensoren als fertige Datenpunkte.",
+        "ru": "Добавлено локальное управление (LAN) через maveo box — без облака: укажите IP, один раз нажмите жёлтую кнопку, готово. Вход через облако сохранён. Ворота, свет и датчики как готовые состояния.",
+        "pt": "Adicionado controlo local (LAN) da maveo box — sem nuvem: introduza o IP, prima uma vez o botão amarelo, pronto. Login na nuvem continua disponível. Portão, luz e sensores como estados prontos a usar.",
+        "nl": "Lokale (LAN) besturing van de maveo box toegevoegd — zonder cloud: IP invoeren, één keer op de gele knop drukken, klaar. Cloud-login blijft mogelijk. Garagedeur, licht en sensoren als kant-en-klare datapunten.",
+        "fr": "Contrôle local (LAN) de la maveo box ajouté — sans cloud : saisir l'IP, appuyer une fois sur le bouton jaune, c'est prêt. La connexion cloud reste disponible. Porte, lumière et capteurs comme états prêts à l'emploi.",
+        "it": "Aggiunto controllo locale (LAN) della maveo box — senza cloud: inserisci l'IP, premi una volta il pulsante giallo, fatto. Login cloud ancora disponibile. Portone, luce e sensori come stati pronti all'uso.",
+        "es": "Añadido control local (LAN) de la maveo box — sin nube: introduce la IP, pulsa una vez el botón amarillo, listo. El acceso por nube sigue disponible. Puerta, luz y sensores como estados listos para usar.",
+        "pl": "Dodano lokalne sterowanie (LAN) bramką maveo — bez chmury: wpisz IP, raz naciśnij żółty przycisk, gotowe. Logowanie w chmurze nadal dostępne. Brama, światło i czujniki jako gotowe punkty danych.",
+        "uk": "Додано локальне керування (LAN) через maveo box — без хмари: введіть IP, один раз натисніть жовту кнопку, готово. Вхід через хмару збережено. Ворота, світло та датчики як готові стани.",
+        "zh-cn": "新增 maveo box 的本地 (LAN) 控制——无需云端：填入 IP，按一次黄色按钮即可。云端登录仍可用。车库门、灯光和传感器均为即用状态点。"
+      },
       "0.1.0": {
         "en": "rewritten against the Marantec cloud backend (region select, real Cognito pool/client IDs, thing/action discovery over the nymea tunnel, working remote controls)",
         "de": "Adapter komplett gegen die Marantec-Cloud umgeschrieben (Region auswählbar, echte Cognito-Pool/Client-IDs, Thing/Action-Discovery über Nymea-Tunnel, funktionierende Remote-Steuerung)",

@@ -60,14 +60,24 @@ https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
 
+### 0.1.1
+
+* **Local (LAN) control added — this is the easy, recommended way and needs no
+  cloud account:**
+  1. Find the IP address of your maveo box (check your router's device list).
+  2. In the adapter settings enter it under **Maveo box IP** and save.
+  3. On the first start the adapter asks you to press the **yellow button on
+    the maveo box**. You have 5 minutes — just walk over and press it once.
+  4. Done. The token is stored, future restarts connect on their own.
+* Cloud login (maveo app e-mail/password) still works as an alternative.
+* Your garage door, light and sensors show up as ready-to-use data points
+  under `maveo.0.<device>` — with an `open`/`close`/`light` control section
+  and a `status` section.
+
 ### 0.1.0
 
-* Two operating modes: cloud (Cognito + Nymea tunnel) and LAN (direct
-  connection to the box with push-button auth). Region selectable (EU/US).
-  Cognito pool/client IDs and cloud endpoints verified against the maveo app
-  2.6.1 (Ghidra decompile). Thing/action discovery over Nymea, push-based
-  state updates, working remote control, message buffering and exponential
-  reconnect back-off.
+* First working version against the current Marantec/nymea backend: cloud
+  login, device discovery and remote control.
 
 ### 0.0.5
 
