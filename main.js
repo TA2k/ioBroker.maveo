@@ -1105,6 +1105,7 @@ class Maveo extends utils.Adapter {
           val: this.coerceStateValue(stateType, currentValues[stateType.id]),
           ack: true,
         });
+        await this.deriveBooleans(id, stateType, currentValues[stateType.id]);
       }
     }
   }
@@ -1125,6 +1126,51 @@ class Maveo extends utils.Adapter {
       val: this.coerceStateValue(stateType, params.value),
       ack: true,
     });
+    await this.deriveBooleans(thingId, stateType, params.value);
+  }
+
+  /**
+   * Some nymea states are enums/text ("open"/"closing", "↑"/"↓"/"-") that are
+   * awkward to use in logic or VIS. For those we additionally publish plain
+   * boolean convenience states under <thingId>.status.*, without touching the
+   * original text state.
+   * @param {string} thingId
+   * @param {any} stateType
+   * @param {any} value
+   */
+  async deriveBooleans(thingId, stateType, value) {
+    const rawName = (stateType.name || stateType.displayName || "").toLowerCase();
+    /** @type {{id: string, name: string, val: boolean}[]} */
+    let derived;
+
+    // Door position: State / status enum → open/closed/opening/closing.
+    if (rawName === "state" || rawName === "status") {
+      const v = String(value).toLowerCase();
+      derived = [
+        { id: "isOpen", name: "Offen", val: v === "open" },
+        { id: "isClosed", name: "Geschlossen", val: v === "closed" || v === "intermediate" },
+        { id: "isOpening", name: "Öffnet", val: v === "opening" },
+        { id: "isClosing", name: "Schließt", val: v === "closing" },
+      ];
+    } else if (/moving|bewegung/.test(rawName)) {
+      // Movement arrow: "↑"/"↓"/"-".
+      const v = String(value);
+      derived = [
+        { id: "isMoving", name: "In Bewegung", val: v !== "-" && v !== "" },
+      ];
+    } else {
+      return;
+    }
+
+    for (const d of derived) {
+      const objId = `${thingId}.status.${d.id}`;
+      await this.setObjectNotExistsAsync(objId, {
+        type: "state",
+        common: { name: d.name, type: "boolean", role: "indicator", read: true, write: false },
+        native: { derivedFrom: stateType.id },
+      });
+      await this.setStateAsync(objId, { val: d.val, ack: true });
+    }
   }
 
   /**
