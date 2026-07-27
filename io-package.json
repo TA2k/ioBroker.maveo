@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "maveo",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "news": {
+      "0.1.2": {
+        "en": "Garage door position and movement are now also available as simple on/off states (isOpen, isClosed, isOpening, isClosing, isMoving) — easier to use in logic and visualizations than the text/arrow values.",
+        "de": "Tor-Position und -Bewegung gibt es jetzt zusätzlich als einfache An/Aus-Datenpunkte (isOpen, isClosed, isOpening, isClosing, isMoving) — leichter für Logik und Visualisierung als die Text-/Pfeilwerte.",
+        "ru": "Положение и движение ворот теперь доступны и как простые состояния вкл/выкл (isOpen, isClosed, isOpening, isClosing, isMoving) — удобнее для логики и визуализации, чем текст/стрелки.",
+        "pt": "A posição e o movimento do portão estão agora também disponíveis como estados simples ligado/desligado (isOpen, isClosed, isOpening, isClosing, isMoving) — mais fáceis de usar em lógica e visualização do que os valores de texto/seta.",
+        "nl": "Positie en beweging van de garagedeur zijn nu ook beschikbaar als eenvoudige aan/uit-datapunten (isOpen, isClosed, isOpening, isClosing, isMoving) — makkelijker voor logica en visualisatie dan de tekst/pijl-waarden.",
+        "fr": "La position et le mouvement de la porte sont désormais aussi disponibles en états simples marche/arrêt (isOpen, isClosed, isOpening, isClosing, isMoving) — plus faciles à utiliser en logique et visualisation que les valeurs texte/flèche.",
+        "it": "Posizione e movimento del portone ora sono disponibili anche come semplici stati on/off (isOpen, isClosed, isOpening, isClosing, isMoving) — più comodi per logiche e visualizzazioni rispetto ai valori testo/freccia.",
+        "es": "La posición y el movimiento de la puerta ahora también están disponibles como estados simples on/off (isOpen, isClosed, isOpening, isClosing, isMoving), más fáciles de usar en lógica y visualización que los valores de texto/flecha.",
+        "pl": "Pozycja i ruch bramy są teraz dostępne także jako proste stany wł/wył (isOpen, isClosed, isOpening, isClosing, isMoving) — wygodniejsze w logice i wizualizacji niż wartości tekstowe/strzałki.",
+        "uk": "Положення та рух воріт тепер доступні також як прості стани увімк/вимк (isOpen, isClosed, isOpening, isClosing, isMoving) — зручніші для логіки та візуалізації, ніж текст/стрілки.",
+        "zh-cn": "车库门的位置和运动现在还提供简单的开/关状态点（isOpen、isClosed、isOpening、isClosing、isMoving），比文本/箭头值更便于逻辑和可视化使用。"
+      },
       "0.1.1": {
         "en": "Local (LAN) control of the maveo box added — no cloud needed: enter the box IP, press the yellow button once, done. Cloud login still available. Garage door, light and sensors as ready-to-use states.",
         "de": "Lokale Steuerung (LAN) der maveo-Box ergänzt — ohne Cloud: Box-IP eintragen, einmal die gelbe Taste drücken, fertig. Cloud-Login weiterhin möglich. Garagentor, Licht und Sensoren als fertige Datenpunkte.",

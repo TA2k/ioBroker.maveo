@@ -60,6 +60,14 @@ https://forum.iobroker.net/topic/48101/test-adapter-maveo-v-0-0-x
 
 ## Changelog
 
+### 0.1.2
+
+* Garage door position and movement are now also published as simple boolean
+  states in the `status` channel — `isOpen`, `isClosed`, `isOpening`,
+  `isClosing` and `isMoving`. These are much easier to use in logic blocks and
+  visualizations than the original text value (`open`/`closing`/…) and arrow
+  glyph (`↑`/`↓`/`-`), which remain available unchanged.
+
 ### 0.1.1
 
 * **Local (LAN) control added — this is the easy, recommended way and needs no
